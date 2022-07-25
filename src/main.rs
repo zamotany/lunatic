@@ -1,5 +1,9 @@
+use parser::Parser;
+
 mod token;
 mod scanner;
+mod parser;
+mod ast;
 
 const INPUT_SOURCE: &str = "
 function fact (n)
@@ -22,6 +26,14 @@ end
 ";
 
 fn main() {
-    let mut scanner = scanner::Scanner::new(INPUT_SOURCE);
-    println!("{:#?}", scanner.scan_tokens());
+    let mut scanner = scanner::Scanner::new("not (not true)");
+		match scanner.scan_tokens() {
+			Ok(tokens) => {
+				let mut parser = Parser::new(tokens);
+                println!("{:#?}", parser.parse())
+			},
+			Err(error) => {
+				println!("{}", error);
+			}
+		}
 }

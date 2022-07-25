@@ -188,6 +188,7 @@ impl<'s> Scanner<'s> {
             "end" => self.add_token(TokenType::End, None),
             "function" => self.add_token(TokenType::Function, None),
             "nil" => self.add_token(TokenType::Nil, None),
+            "not" => self.add_token(TokenType::Not, None),
             "false" => self.add_token(TokenType::False, None),
             "true" => self.add_token(TokenType::True, None),
             "return" => self.add_token(TokenType::Return, None),
@@ -199,9 +200,15 @@ impl<'s> Scanner<'s> {
                 let elseif_replacement = match self.tokens.last() {
                     Some(token) if token.token_type == TokenType::Else => {
                         let lexeme = &self.source[token.lexeme_start..self.current];
-                        let token = Token::new(TokenType::Elseif, lexeme, token.lexeme_start, None, self.line);
+                        let token = Token::new(
+                            TokenType::Elseif,
+                            lexeme,
+                            token.lexeme_start,
+                            None,
+                            self.line,
+                        );
                         Some(token)
-                    },
+                    }
                     _ => None,
                 };
 
@@ -210,12 +217,12 @@ impl<'s> Scanner<'s> {
                         if let Some(elseif_replacement) = elseif_replacement {
                             *token = elseif_replacement;
                         }
-                    },
+                    }
                     _ => {
                         self.add_token(TokenType::If, None);
-                    },
+                    }
                 };
-            },
+            }
             "else" => self.add_token(TokenType::Else, None),
             "then" => self.add_token(TokenType::Then, None),
             "repeat" => self.add_token(TokenType::Repeat, None),
@@ -329,6 +336,58 @@ impl<'s> Scanner<'s> {
             }
         }
 
+        self.tokens.push(Token::new(
+            TokenType::Eof,
+            "",
+            self.current,
+            None,
+            self.line,
+        ));
+
         Ok(&self.tokens)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_scan_unary_expressions() {
+        assert_eq!(
+            Scanner::new("-1").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Minus, "-", 0, None, 1),
+                Token::new(TokenType::Numeral, "1", 1, Some("1"), 1),
+                Token::new(TokenType::Eof, "", 2, None, 1),
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("not true").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Not, "not", 0, None, 1),
+                Token::new(TokenType::True, "true", 4, None, 1),
+                Token::new(TokenType::Eof, "", 8, None, 1),
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("#some_array").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Hash, "#", 0, None, 1),
+                Token::new(TokenType::Identifier, "some_array", 1, None, 1),
+                Token::new(TokenType::Eof, "", 11, None, 1),
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("~value").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Tilde, "~", 0, None, 1),
+                Token::new(TokenType::Identifier, "value", 1, None, 1),
+                Token::new(TokenType::Eof, "", 6, None, 1),
+            ])
+        );
     }
 }

@@ -44,6 +44,7 @@ pub enum TokenType {
     End,
     Function,
     Nil,
+    Not,
     False,
     True,
     Return,
@@ -64,7 +65,7 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Token<'t> {
     pub token_type: TokenType,
     pub lexeme: &'t str,
