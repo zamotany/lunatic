@@ -157,7 +157,7 @@ impl<'s> Scanner<'s> {
     }
 
     fn scan_numeral(&mut self) {
-        while self.is_numeric(self.char_at(self.current + 1).unwrap_or('\0')) {
+        while self.is_numeric(self.char_at(self.current).unwrap_or('\0')) {
             self.advance_cursor(1);
         }
 
@@ -266,8 +266,7 @@ impl<'s> Scanner<'s> {
                     '<' => {
                         if self.consume_matching('=') {
                             self.add_token(TokenType::LessEqual, None)
-                        }
-                        if self.consume_matching('<') {
+                        } else if self.consume_matching('<') {
                             self.add_token(TokenType::LessLess, None)
                         } else {
                             self.add_token(TokenType::Less, None)
@@ -276,8 +275,7 @@ impl<'s> Scanner<'s> {
                     '>' => {
                         if self.consume_matching('=') {
                             self.add_token(TokenType::GreaterEqual, None)
-                        }
-                        if self.consume_matching('>') {
+                        } else if self.consume_matching('>') {
                             self.add_token(TokenType::GreaterGreater, None)
                         } else {
                             self.add_token(TokenType::Greater, None)
@@ -444,5 +442,39 @@ mod tests {
                 Token::new(TokenType::Eof, "", 6, None, 1),
             ])
         );
+    }
+
+    #[test]
+    fn should_scan_comparisons() {
+        assert_eq!(
+            Scanner::new("5 >= 5").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Numeral, "5", 0, Some("5"), 1),
+                Token::new(TokenType::GreaterEqual, ">=", 2, None, 1),
+                Token::new(TokenType::Numeral, "5", 5, Some("5"), 1),
+                Token::new(TokenType::Eof, "", 6, None, 1),
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("5 <= 5").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Numeral, "5", 0, Some("5"), 1),
+                Token::new(TokenType::LessEqual, "<=", 2, None, 1),
+                Token::new(TokenType::Numeral, "5", 5, Some("5"), 1),
+                Token::new(TokenType::Eof, "", 6, None, 1),
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("11 < 10").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Numeral, "11", 0, Some("11"), 1),
+                Token::new(TokenType::Less, "<", 3, None, 1),
+                Token::new(TokenType::Numeral, "10", 5, Some("10"), 1),
+                Token::new(TokenType::Eof, "", 7, None, 1),
+            ])
+        );
+
     }
 }
