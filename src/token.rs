@@ -21,7 +21,7 @@ pub enum TokenType {
     Slash,      // /
     SlashSlash, // //
     Caret,      // ^
-    Precent,    // %
+    Percent,    // %
     Ampersand,  // &
     Tilde,      // ~
     Pipe,       // |
@@ -41,6 +41,8 @@ pub enum TokenType {
     LiteralString,
     Numeral,
 
+    Or,
+    And,
     End,
     Function,
     Nil,

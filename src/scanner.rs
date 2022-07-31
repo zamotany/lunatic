@@ -185,6 +185,8 @@ impl<'s> Scanner<'s> {
 
         let literal = &self.source[self.start..self.current];
         match literal {
+            "or" => self.add_token(TokenType::Or, None),
+            "and" => self.add_token(TokenType::And, None),
             "end" => self.add_token(TokenType::End, None),
             "function" => self.add_token(TokenType::Function, None),
             "nil" => self.add_token(TokenType::Nil, None),
@@ -290,8 +292,15 @@ impl<'s> Scanner<'s> {
                         }
                     }
                     '*' => self.add_token(TokenType::Star, None),
+                    '/' => {
+                        if self.consume_matching('/') {
+                            self.add_token(TokenType::SlashSlash, None);
+                        } else {
+                            self.add_token(TokenType::Slash, None);
+                        }
+                    }
                     '^' => self.add_token(TokenType::Caret, None),
-                    '%' => self.add_token(TokenType::Precent, None),
+                    '%' => self.add_token(TokenType::Percent, None),
                     '&' => self.add_token(TokenType::Ampersand, None),
                     '~' => {
                         if self.consume_matching('=') {
@@ -330,7 +339,10 @@ impl<'s> Scanner<'s> {
                     char if self.is_numeric(char) => self.scan_numeral(),
                     char if self.is_alpha(char) => self.scan_identifier(),
                     _ => {
-                        return Err(format!("unexpected character on line: {}", self.line));
+                        return Err(format!(
+                            "unexpected character `{}` on line: {}",
+                            char, self.line
+                        ));
                     }
                 }
             }
@@ -386,6 +398,49 @@ mod tests {
             Ok(&vec![
                 Token::new(TokenType::Tilde, "~", 0, None, 1),
                 Token::new(TokenType::Identifier, "value", 1, None, 1),
+                Token::new(TokenType::Eof, "", 6, None, 1),
+            ])
+        );
+    }
+
+    #[test]
+    fn should_scan_binary_expressions() {
+        assert_eq!(
+            Scanner::new("3 * 2").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Numeral, "3", 0, Some("3"), 1),
+                Token::new(TokenType::Star, "*", 2, None, 1),
+                Token::new(TokenType::Numeral, "2", 4, Some("2"), 1),
+                Token::new(TokenType::Eof, "", 5, None, 1),
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("3 ^ 2").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Numeral, "3", 0, Some("3"), 1),
+                Token::new(TokenType::Caret, "^", 2, None, 1),
+                Token::new(TokenType::Numeral, "2", 4, Some("2"), 1),
+                Token::new(TokenType::Eof, "", 5, None, 1),
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("3 / 2").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Numeral, "3", 0, Some("3"), 1),
+                Token::new(TokenType::Slash, "/", 2, None, 1),
+                Token::new(TokenType::Numeral, "2", 4, Some("2"), 1),
+                Token::new(TokenType::Eof, "", 5, None, 1),
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("3 // 2").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Numeral, "3", 0, Some("3"), 1),
+                Token::new(TokenType::SlashSlash, "//", 2, None, 1),
+                Token::new(TokenType::Numeral, "2", 5, Some("2"), 1),
                 Token::new(TokenType::Eof, "", 6, None, 1),
             ])
         );

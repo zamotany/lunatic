@@ -5,4 +5,5 @@ pub enum Expression<'e> {
     Literal(&'e Token<'e>),
     Group(Box<Expression<'e>>),
     Unary(&'e Token<'e>, Box<Expression<'e>>),
+    Binary(Box<Expression<'e>>, &'e Token<'e>, Box<Expression<'e>>),
 }
