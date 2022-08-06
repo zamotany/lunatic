@@ -7,7 +7,7 @@ use std::cell::RefCell;
 type ParsingResult<'e> = Result<Option<Expression<'e>>, String>;
 
 /// Lua parser.
-/// 
+///
 /// Specs:
 /// - https://www.lua.org/manual/5.4/manual.html#9
 /// - http://www.lua.org/manual/5.4/manual.html#3.4.8
@@ -105,12 +105,12 @@ impl<'p> Parser<'p> {
         self.try_parse_single_token(
             TokenType::And,
             || self.parse_maybe_binary_relation(),
-            || self.parse_maybe_expression(),
+            || self.parse_maybe_binary_and(),
         )
     }
 
     fn parse_maybe_binary_relation(&self) -> ParsingResult {
-        let left = self.parse_maybe_binary_generic()?;
+        let left = self.parse_maybe_binary_bitwise_or()?;
         if left.is_none() {
             return Ok(None);
         }
@@ -124,7 +124,7 @@ impl<'p> Parser<'p> {
                 | TokenType::TildeEqual
                 | TokenType::EqualEqual => {
                     self.advance_cursor();
-                    let right = self.parse_maybe_binary_generic()?;
+                    let right = self.parse_maybe_binary_relation()?;
                     match right {
                         Some(right) => Ok(Some(Expression::Binary(
                             Box::new(left.unwrap()),
@@ -141,46 +141,41 @@ impl<'p> Parser<'p> {
         Ok(None)
     }
 
-    // fn parse_maybe_binary_bitwise_or(&self) -> ParsingResult {}
+    fn parse_maybe_binary_bitwise_or(&self) -> ParsingResult {
+        self.try_parse_single_token(
+            TokenType::Pipe,
+            || self.parse_maybe_binary_bitwise_xor(),
+            || self.parse_maybe_binary_bitwise_or(),
+        )
+    }
 
-    // fn parse_maybe_binary_bitwise_xor(&self) -> ParsingResult {}
+    fn parse_maybe_binary_bitwise_xor(&self) -> ParsingResult {
+        self.try_parse_single_token(
+            TokenType::Tilde,
+            || self.parse_maybe_binary_bitwise_and(),
+            || self.parse_maybe_binary_bitwise_xor(),
+        )
+    }
 
-    // fn parse_maybe_binary_bitwise_and(&self) -> ParsingResult {}
+    fn parse_maybe_binary_bitwise_and(&self) -> ParsingResult {
+        self.try_parse_single_token(
+            TokenType::Ampersand,
+            || self.parse_maybe_binary_shift(),
+            || self.parse_maybe_binary_bitwise_and(),
+        )
+    }
 
-    // fn parse_maybe_binary_shift(&self) -> ParsingResult {}
-
-    // fn parse_maybe_binary_concat(&self) -> ParsingResult {}
-
-    // fn parse_maybe_binary_arithmetic_simple(&self) -> ParsingResult {}
-
-    // fn parse_maybe_binary_arithmetic_complex(&self) -> ParsingResult {}
-
-    // fn parse_maybe_binary_exponent(&self) -> ParsingResult {}
-
-    /// TODO: split into parse_maybe_binary_*
-    fn parse_maybe_binary_generic(&self) -> ParsingResult {
-        let left = self.parse_maybe_prefix()?;
+    fn parse_maybe_binary_shift(&self) -> ParsingResult {
+        let left = self.parse_maybe_binary_concat()?;
         if left.is_none() {
             return Ok(None);
         }
 
         if let Some(token) = self.get_token() {
             return match token.token_type {
-                TokenType::LessLess
-                | TokenType::Pipe
-                | TokenType::Tilde
-                | TokenType::Ampersand
-                | TokenType::GreaterGreater
-                | TokenType::DotDot
-                | TokenType::Plus
-                | TokenType::Minus
-                | TokenType::Star
-                | TokenType::Slash
-                | TokenType::SlashSlash
-                | TokenType::Percent
-                | TokenType::Caret => {
+                TokenType::LessLess | TokenType::GreaterGreater => {
                     self.advance_cursor();
-                    let right = self.parse_maybe_binary_generic()?;
+                    let right = self.parse_maybe_binary_shift()?;
                     match right {
                         Some(right) => Ok(Some(Expression::Binary(
                             Box::new(left.unwrap()),
@@ -195,6 +190,94 @@ impl<'p> Parser<'p> {
         }
 
         Ok(None)
+    }
+
+    fn parse_maybe_binary_concat(&self) -> ParsingResult {
+        self.try_parse_single_token(
+            TokenType::DotDot,
+            || self.parse_maybe_binary_arithmetic_simple(),
+            || self.parse_maybe_binary_concat(),
+        )
+    }
+
+    fn parse_maybe_binary_arithmetic_simple(&self) -> ParsingResult {
+        let left = self.parse_maybe_binary_arithmetic_complex()?;
+        if left.is_none() {
+            return Ok(None);
+        }
+
+        if let Some(token) = self.get_token() {
+            return match token.token_type {
+                TokenType::Plus | TokenType::Minus => {
+                    self.advance_cursor();
+                    let right = self.parse_maybe_binary_arithmetic_simple()?;
+                    match right {
+                        Some(right) => Ok(Some(Expression::Binary(
+                            Box::new(left.unwrap()),
+                            token,
+                            Box::new(right),
+                        ))),
+                        None => Err(String::from("Failed to parse operand of binary expression")),
+                    }
+                }
+                _ => Ok(left),
+            };
+        }
+
+        Ok(None)
+    }
+
+    fn parse_maybe_binary_arithmetic_complex(&self) -> ParsingResult {
+        let left = self.parse_maybe_unary()?;
+        if left.is_none() {
+            return Ok(None);
+        }
+
+        if let Some(token) = self.get_token() {
+            return match token.token_type {
+                TokenType::Star | TokenType::Slash | TokenType::SlashSlash | TokenType::Percent => {
+                    self.advance_cursor();
+                    let right = self.parse_maybe_binary_arithmetic_complex()?;
+                    match right {
+                        Some(right) => Ok(Some(Expression::Binary(
+                            Box::new(left.unwrap()),
+                            token,
+                            Box::new(right),
+                        ))),
+                        None => Err(String::from("Failed to parse operand of binary expression")),
+                    }
+                }
+                _ => Ok(left),
+            };
+        }
+
+        Ok(None)
+    }
+
+    fn parse_maybe_unary(&self) -> ParsingResult {
+        if let Some(token) = self.get_token() {
+            return match token.token_type {
+                TokenType::Minus | TokenType::Not | TokenType::Hash | TokenType::Tilde => {
+                    self.advance_cursor();
+                    let right = self.parse_maybe_unary()?;
+                    match right {
+                        Some(right) => Ok(Some(Expression::Unary(token, Box::new(right)))),
+                        None => Err(String::from("Failed to parse operand of unary expression")),
+                    }
+                }
+                _ => self.parse_maybe_binary_exponent(),
+            };
+        }
+
+        Ok(None)
+    }
+
+    fn parse_maybe_binary_exponent(&self) -> ParsingResult {
+        self.try_parse_single_token(
+            TokenType::Caret,
+            || self.parse_maybe_prefix(),
+            || self.parse_maybe_binary_exponent(),
+        )
     }
 
     fn parse_maybe_prefix(&self) -> ParsingResult {
@@ -209,24 +292,6 @@ impl<'p> Parser<'p> {
                     match expression {
                         Some(expression) => Ok(Some(Expression::Group(Box::new(expression)))),
                         None => Err(String::from("Expected ')' after expression")),
-                    }
-                }
-                _ => self.parse_maybe_unary(),
-            };
-        }
-
-        Ok(None)
-    }
-
-    fn parse_maybe_unary(&self) -> ParsingResult {
-        if let Some(token) = self.get_token() {
-            return match token.token_type {
-                TokenType::Minus | TokenType::Not | TokenType::Hash | TokenType::Tilde => {
-                    self.advance_cursor();
-                    let right = self.parse_maybe_expression()?;
-                    match right {
-                        Some(right) => Ok(Some(Expression::Unary(token, Box::new(right)))),
-                        None => Err(String::from("Failed to parse operand of unary expression")),
                     }
                 }
                 _ => self.parse_maybe_literal(),
@@ -271,10 +336,14 @@ mod tests {
     }
 
     #[test]
-    fn should_parse_conditionals() {
+    fn should_parse_expressions() {
         expect_source_to_equal_ast(
             "true or (false and true) and true",
             "[or l=`true` r=[and l=([and l=`false` r=`true`]) r=`true`]]",
+        );
+        expect_source_to_equal_ast(
+            "true and false and true",
+            "[and l=`true` r=[and l=`false` r=`true`]]",
         );
         expect_source_to_equal_ast(
             "true or false and true and true",
@@ -289,8 +358,44 @@ mod tests {
         expect_source_to_equal_ast("1 >= 2 and 3", "[and l=[>= l=`1` r=`2`] r=`3`]");
         expect_source_to_equal_ast(
             "false and 5 >= 5 or 11 < 10",
-            "[and l=`false` r=[or l=[>= l=`5` r=`5`] r=[< l=`11` r=`10`]]]",
+            "[or l=[and l=`false` r=[>= l=`5` r=`5`]] r=[< l=`11` r=`10`]]",
+        );
+        expect_source_to_equal_ast(
+            "2 == 2 ^ 1 or true",
+            "[or l=[== l=`2` r=[^ l=`2` r=`1`]] r=`true`]",
+        );
+        expect_source_to_equal_ast("not true or true", "[or l=[not r=`true`] r=`true`]");
+        expect_source_to_equal_ast(
+            "2 / 2 == 1 and true",
+            "[and l=[== l=[/ l=`2` r=`2`] r=`1`] r=`true`]",
+        );
+        expect_source_to_equal_ast(
+            "2 - 1 == 1 and true",
+            "[and l=[== l=[- l=`2` r=`1`] r=`1`] r=`true`]",
+        );
+        expect_source_to_equal_ast(
+            "'hello' .. 'world' ~= 0 or true",
+            "[or l=[~= l=[.. l=`'hello'` r=`'world'`] r=`0`] r=`true`]",
+        );
+        expect_source_to_equal_ast(
+            "2 << 2 == 8 or true",
+            "[or l=[== l=[<< l=`2` r=`2`] r=`8`] r=`true`]",
+        );
+        expect_source_to_equal_ast(
+            "1 & 1 == 3 or true",
+            "[or l=[== l=[& l=`1` r=`1`] r=`3`] r=`true`]",
+        );
+        expect_source_to_equal_ast(
+            "1 ~ 1 == 3 or true",
+            "[or l=[== l=[~ l=`1` r=`1`] r=`3`] r=`true`]",
+        );
+        expect_source_to_equal_ast(
+            "1 | 1 == 3 or true",
+            "[or l=[== l=[| l=`1` r=`1`] r=`3`] r=`true`]",
+        );
+        expect_source_to_equal_ast(
+            "(1 ~= 2 or (true or 2 << 1 == 4)) and false and (true or false)",
+            "[and l=([or l=[~= l=`1` r=`2`] r=([or l=`true` r=[== l=[<< l=`2` r=`1`] r=`4`]])]) r=[and l=`false` r=([or l=`true` r=`false`])]]"
         );
     }
 }
-

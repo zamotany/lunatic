@@ -99,7 +99,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_create_token() {
+    fn should_create_token() {
         let token = Token::new(TokenType::Function, "test", 0, None, 1);
         assert_eq!(token.token_type, TokenType::Function);
     }
