@@ -2,6 +2,7 @@ use crate::{
     ast::{
         expression::{Expression, ExpressionVisitor},
         field::Field,
+        prefix::Prefix,
         table_constructor::TableConstructor,
     },
     token::Token,
@@ -20,10 +21,6 @@ impl ExpressionVisitor for DebugVisitor {
 
     fn visit_literal(&self, token: &Token) -> String {
         format!("`{}`", token.lexeme)
-    }
-
-    fn visit_group(&self, expression: &Box<Expression>) -> String {
-        format!("({})", expression.visit(self))
     }
 
     fn visit_unary(&self, operator: &Token, right: &Box<Expression>) -> String {
@@ -59,5 +56,12 @@ impl ExpressionVisitor for DebugVisitor {
             fields_string.push_str(&field_string[..]);
         }
         format!("Tc[{}]", fields_string)
+    }
+
+    fn visit_prefix(&self, prefix: &crate::ast::prefix::Prefix) -> String {
+        match prefix {
+            Prefix::Group(expression) => format!("({})", expression.visit(self)),
+            Prefix::Variable(_) => String::new(),
+        }
     }
 }

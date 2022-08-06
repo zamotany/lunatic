@@ -13,12 +13,4 @@ impl<'a> TableConstructor<'a> {
     pub fn new_expression(fields: Vec<Field<'a>>) -> Expression {
         Expression::TableConstructor(TableConstructor::new(fields))
     }
-
-    pub fn empty() -> TableConstructor<'a> {
-        TableConstructor::new(vec![])
-    }
-
-    pub fn empty_expression() -> Expression<'a> {
-        Expression::TableConstructor(TableConstructor::empty())
-    }
 }

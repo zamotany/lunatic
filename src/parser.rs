@@ -1,6 +1,6 @@
 use crate::{
     ast::{
-        expression::Expression, field::Field, identifier::Identifier,
+        expression::Expression, field::Field, identifier::Identifier, prefix::Prefix,
         table_constructor::TableConstructor,
     },
     token::{Token, TokenType},
@@ -254,7 +254,9 @@ impl<'p> Parser<'p> {
                     let expression = self.parse_maybe_expression()?;
                     self.advance_cursor();
                     match expression {
-                        Some(expression) => Ok(Some(Expression::Group(Box::new(expression)))),
+                        Some(expression) => Ok(Some(Expression::Prefix(Prefix::Group(Box::new(
+                            expression,
+                        ))))),
                         None => Err(String::from("Expected ')' after expression")),
                     }
                 }
@@ -465,6 +467,10 @@ mod tests {
         expect_source_to_equal_ast(
             "(1 ~= 2 or (true or 2 << 1 == 4)) and false and (true or false)",
             "[and l=([or l=[~= l=`1` r=`2`] r=([or l=`true` r=[== l=[<< l=`2` r=`1`] r=`4`]])]) r=[and l=`false` r=([or l=`true` r=`false`])]]"
+        );
+        expect_source_to_equal_ast(
+            "{ foo = 1, bar = 2 } and true",
+            "[and l=Tc[`foo`=`1` `bar`=`2` ] r=`true`]",
         );
     }
 
