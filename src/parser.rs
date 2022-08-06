@@ -44,21 +44,25 @@ impl<'p> Parser<'p> {
         Some(&self.tokens[*self.current.borrow()])
     }
 
-    /// Utility function to parse a single expression for given token.
-    fn try_parse_single_token<L, R>(
+    /// Utility function to parse a binary expression.
+    fn try_parse_binary_expression<M, L, R>(
         &self,
-        token_type: TokenType,
+        matches_token: M,
         parse_left: L,
         parse_right: R,
     ) -> ParsingResult
     where
+        M: FnOnce(&TokenType) -> bool,
         L: FnOnce() -> ParsingResult<'p>,
         R: FnOnce() -> ParsingResult<'p>,
     {
         let left = parse_left()?;
+        if left.is_none() {
+            return Ok(None);
+        }
 
         if let Some(token) = self.get_token() {
-            if token.token_type == token_type && left.is_some() {
+            if matches_token(&token.token_type) {
                 self.advance_cursor();
                 return match parse_right()? {
                     Some(right) => Ok(Some(Expression::Binary(
@@ -94,164 +98,108 @@ impl<'p> Parser<'p> {
     }
 
     fn parse_maybe_binary_or(&self) -> ParsingResult {
-        self.try_parse_single_token(
-            TokenType::Or,
+        self.try_parse_binary_expression(
+            |token_type| token_type == &TokenType::Or,
             || self.parse_maybe_binary_and(),
             || self.parse_maybe_expression(),
         )
     }
 
     fn parse_maybe_binary_and(&self) -> ParsingResult {
-        self.try_parse_single_token(
-            TokenType::And,
+        self.try_parse_binary_expression(
+            |token_type| token_type == &TokenType::And,
             || self.parse_maybe_binary_relation(),
             || self.parse_maybe_binary_and(),
         )
     }
 
     fn parse_maybe_binary_relation(&self) -> ParsingResult {
-        let left = self.parse_maybe_binary_bitwise_or()?;
-        if left.is_none() {
-            return Ok(None);
-        }
-
-        if let Some(token) = self.get_token() {
-            return match token.token_type {
-                TokenType::Less
-                | TokenType::LessEqual
-                | TokenType::Greater
-                | TokenType::GreaterEqual
-                | TokenType::TildeEqual
-                | TokenType::EqualEqual => {
-                    self.advance_cursor();
-                    let right = self.parse_maybe_binary_relation()?;
-                    match right {
-                        Some(right) => Ok(Some(Expression::Binary(
-                            Box::new(left.unwrap()),
-                            token,
-                            Box::new(right),
-                        ))),
-                        None => Err(String::from("Failed to parse operand of binary expression")),
-                    }
+        self.try_parse_binary_expression(
+            |token_type| {
+                match token_type {
+                    TokenType::Less
+                    | TokenType::LessEqual
+                    | TokenType::Greater
+                    | TokenType::GreaterEqual
+                    | TokenType::TildeEqual
+                    | TokenType::EqualEqual => true,
+                    _ => false,
                 }
-                _ => Ok(left),
-            };
-        }
-
-        Ok(None)
+            },
+            || self.parse_maybe_binary_bitwise_or(),
+            || self.parse_maybe_binary_relation(),
+        )
     }
 
     fn parse_maybe_binary_bitwise_or(&self) -> ParsingResult {
-        self.try_parse_single_token(
-            TokenType::Pipe,
+        self.try_parse_binary_expression(
+            |token_type| token_type == &TokenType::Pipe,
             || self.parse_maybe_binary_bitwise_xor(),
             || self.parse_maybe_binary_bitwise_or(),
         )
     }
 
     fn parse_maybe_binary_bitwise_xor(&self) -> ParsingResult {
-        self.try_parse_single_token(
-            TokenType::Tilde,
+        self.try_parse_binary_expression(
+            |token_type| token_type == &TokenType::Tilde,
             || self.parse_maybe_binary_bitwise_and(),
             || self.parse_maybe_binary_bitwise_xor(),
         )
     }
 
     fn parse_maybe_binary_bitwise_and(&self) -> ParsingResult {
-        self.try_parse_single_token(
-            TokenType::Ampersand,
+        self.try_parse_binary_expression(
+            |token_type| token_type == &TokenType::Ampersand,
             || self.parse_maybe_binary_shift(),
             || self.parse_maybe_binary_bitwise_and(),
         )
     }
 
     fn parse_maybe_binary_shift(&self) -> ParsingResult {
-        let left = self.parse_maybe_binary_concat()?;
-        if left.is_none() {
-            return Ok(None);
-        }
-
-        if let Some(token) = self.get_token() {
-            return match token.token_type {
-                TokenType::LessLess | TokenType::GreaterGreater => {
-                    self.advance_cursor();
-                    let right = self.parse_maybe_binary_shift()?;
-                    match right {
-                        Some(right) => Ok(Some(Expression::Binary(
-                            Box::new(left.unwrap()),
-                            token,
-                            Box::new(right),
-                        ))),
-                        None => Err(String::from("Failed to parse operand of binary expression")),
-                    }
+        self.try_parse_binary_expression(
+            |token_type| {
+                match token_type {
+                    TokenType::LessLess | TokenType::GreaterGreater => true,
+                    _ => false,
                 }
-                _ => Ok(left),
-            };
-        }
-
-        Ok(None)
+            },
+            || self.parse_maybe_binary_concat(),
+            || self.parse_maybe_binary_shift(),
+        )
     }
 
     fn parse_maybe_binary_concat(&self) -> ParsingResult {
-        self.try_parse_single_token(
-            TokenType::DotDot,
+        self.try_parse_binary_expression(
+            |token_type| token_type == &TokenType::DotDot,
             || self.parse_maybe_binary_arithmetic_simple(),
             || self.parse_maybe_binary_concat(),
         )
     }
 
     fn parse_maybe_binary_arithmetic_simple(&self) -> ParsingResult {
-        let left = self.parse_maybe_binary_arithmetic_complex()?;
-        if left.is_none() {
-            return Ok(None);
-        }
-
-        if let Some(token) = self.get_token() {
-            return match token.token_type {
-                TokenType::Plus | TokenType::Minus => {
-                    self.advance_cursor();
-                    let right = self.parse_maybe_binary_arithmetic_simple()?;
-                    match right {
-                        Some(right) => Ok(Some(Expression::Binary(
-                            Box::new(left.unwrap()),
-                            token,
-                            Box::new(right),
-                        ))),
-                        None => Err(String::from("Failed to parse operand of binary expression")),
-                    }
+        self.try_parse_binary_expression(
+            |token_type| {
+                match token_type {
+                    TokenType::Plus | TokenType::Minus => true,
+                    _ => false,
                 }
-                _ => Ok(left),
-            };
-        }
-
-        Ok(None)
+            },
+            || self.parse_maybe_binary_arithmetic_complex(),
+            || self.parse_maybe_binary_arithmetic_simple(),
+        )
     }
 
     fn parse_maybe_binary_arithmetic_complex(&self) -> ParsingResult {
-        let left = self.parse_maybe_unary()?;
-        if left.is_none() {
-            return Ok(None);
-        }
-
-        if let Some(token) = self.get_token() {
-            return match token.token_type {
-                TokenType::Star | TokenType::Slash | TokenType::SlashSlash | TokenType::Percent => {
-                    self.advance_cursor();
-                    let right = self.parse_maybe_binary_arithmetic_complex()?;
-                    match right {
-                        Some(right) => Ok(Some(Expression::Binary(
-                            Box::new(left.unwrap()),
-                            token,
-                            Box::new(right),
-                        ))),
-                        None => Err(String::from("Failed to parse operand of binary expression")),
-                    }
+        self.try_parse_binary_expression(
+            |token_type| {
+                match token_type {
+                    TokenType::Star | TokenType::Slash | TokenType::SlashSlash | TokenType::Percent => true,
+                    _ => false,
                 }
-                _ => Ok(left),
-            };
-        }
-
-        Ok(None)
+            },
+            || self.parse_maybe_unary(),
+            || self.parse_maybe_binary_arithmetic_complex(),
+        )
     }
 
     fn parse_maybe_unary(&self) -> ParsingResult {
@@ -273,8 +221,8 @@ impl<'p> Parser<'p> {
     }
 
     fn parse_maybe_binary_exponent(&self) -> ParsingResult {
-        self.try_parse_single_token(
-            TokenType::Caret,
+        self.try_parse_binary_expression(
+            |token_type| token_type == &TokenType::Caret,
             || self.parse_maybe_prefix(),
             || self.parse_maybe_binary_exponent(),
         )
