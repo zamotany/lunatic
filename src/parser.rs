@@ -297,18 +297,27 @@ impl<'p> Parser<'p> {
                 // expression
                 todo!();
             } else {
-                let key = self.parse_identifier()?;
+                return match self.parse_identifier()? {
+                    Some(key) => {
+                        self.assert_token(
+                            TokenType::Equal,
+                            "Expected '=' in field initialization",
+                        )?;
+                        self.advance_cursor();
 
-                self.assert_token(TokenType::Equal, "Expected '=' in field initialization")?;
-                self.advance_cursor();
-
-                let value = self.parse_maybe_expression()?;
-
-                if key.is_some() && value.is_some() {
-                    return Ok(Some(Field::new(key.unwrap(), value.unwrap())));
-                }
-
-                return Ok(None);
+                        match self.parse_maybe_expression()? {
+                            Some(value) => Ok(Some(Field::new(key, value))),
+                            None => Ok(None),
+                        }
+                    }
+                    None if !self.is_token_of_type(&[TokenType::Equal]) => {
+                        match self.parse_maybe_expression()? {
+                            Some(value) => Ok(Some(Field::new(Identifier::Anonymous, value))),
+                            None => Ok(None),
+                        }
+                    }
+                    _ => Ok(None),
+                };
             }
         }
 
@@ -320,7 +329,7 @@ impl<'p> Parser<'p> {
             return match token.token_type {
                 TokenType::Identifier => {
                     self.advance_cursor();
-                    Ok(Some(Identifier::new(token)))
+                    Ok(Some(Identifier::Named(token)))
                 }
                 _ => Ok(None),
             };
@@ -430,5 +439,7 @@ mod tests {
     #[test]
     fn should_parse_table_constructor() {
         expect_source_to_equal_ast("{ foo = 1, }", "Tc[`foo`=`1` ]");
+        expect_source_to_equal_ast("{ 123 }", "Tc[`?`=`123` ]");
+        expect_source_to_equal_ast("{ 'foo' }", "Tc[`?`=`'foo'` ]");
     }
 }
