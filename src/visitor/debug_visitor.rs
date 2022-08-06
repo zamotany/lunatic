@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         expression::{Expression, ExpressionVisitor},
-        identifier::Identifier,
+        field::Field,
         table_constructor::TableConstructor,
     },
     token::Token,
@@ -47,11 +47,16 @@ impl ExpressionVisitor for DebugVisitor {
     fn visit_table_constructor(&self, table_constructor: &TableConstructor) -> String {
         let mut fields_string = String::new();
         for field in table_constructor.fields.iter() {
-            let key_str = match field.key {
-                Identifier::Anonymous => "?",
-                Identifier::Named(name) => name.lexeme,
+            let field_string = match field {
+                Field::Anonymous(value) => format!("?={} ", value.visit(self)),
+                Field::Expression(key, value) => {
+                    format!("{}={} ", key.visit(self), value.visit(self))
+                }
+                Field::Normal(key, value) => {
+                    format!("`{}`={} ", key.token.lexeme, value.visit(self))
+                }
             };
-            fields_string.push_str(&format!("`{}`={} ", key_str, field.value.visit(self))[..]);
+            fields_string.push_str(&field_string[..]);
         }
         format!("Tc[{}]", fields_string)
     }

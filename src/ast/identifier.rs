@@ -1,7 +1,12 @@
 use crate::token::Token;
 
 #[derive(Debug)]
-pub enum Identifier<'a> {
-    Anonymous,
-    Named(&'a Token<'a>),
+pub struct Identifier<'a> {
+    pub token: &'a Token<'a>,
+}
+
+impl<'a> Identifier<'a> {
+    pub fn new(token: &'a Token<'a>) -> Identifier<'a> {
+        Identifier { token }
+    }
 }

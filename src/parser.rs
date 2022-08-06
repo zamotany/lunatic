@@ -294,8 +294,29 @@ impl<'p> Parser<'p> {
     fn parse_field(&self) -> ParsingResult<Field> {
         if let Some(token) = self.get_token() {
             if token.token_type == TokenType::LeftBracket {
-                // expression
-                todo!();
+                self.advance_cursor();
+
+                return match self.parse_maybe_expression()? {
+                    Some(key) => {
+                        self.assert_token(
+                            TokenType::RightBracket,
+                            "Expected ']' in field initialization",
+                        )?;
+                        self.advance_cursor();
+
+                        self.assert_token(
+                            TokenType::Equal,
+                            "Expected '=' in field initialization",
+                        )?;
+                        self.advance_cursor();
+
+                        match self.parse_maybe_expression()? {
+                            Some(value) => Ok(Some(Field::Expression(key, value))),
+                            None => Ok(None),
+                        }
+                    }
+                    None => Ok(None),
+                };
             } else {
                 return match self.parse_identifier()? {
                     Some(key) => {
@@ -306,13 +327,13 @@ impl<'p> Parser<'p> {
                         self.advance_cursor();
 
                         match self.parse_maybe_expression()? {
-                            Some(value) => Ok(Some(Field::new(key, value))),
+                            Some(value) => Ok(Some(Field::Normal(key, value))),
                             None => Ok(None),
                         }
                     }
                     None if !self.is_token_of_type(&[TokenType::Equal]) => {
                         match self.parse_maybe_expression()? {
-                            Some(value) => Ok(Some(Field::new(Identifier::Anonymous, value))),
+                            Some(value) => Ok(Some(Field::Anonymous(value))),
                             None => Ok(None),
                         }
                     }
@@ -329,7 +350,7 @@ impl<'p> Parser<'p> {
             return match token.token_type {
                 TokenType::Identifier => {
                     self.advance_cursor();
-                    Ok(Some(Identifier::Named(token)))
+                    Ok(Some(Identifier::new(token)))
                 }
                 _ => Ok(None),
             };
@@ -439,7 +460,15 @@ mod tests {
     #[test]
     fn should_parse_table_constructor() {
         expect_source_to_equal_ast("{ foo = 1, }", "Tc[`foo`=`1` ]");
-        expect_source_to_equal_ast("{ 123 }", "Tc[`?`=`123` ]");
-        expect_source_to_equal_ast("{ 'foo' }", "Tc[`?`=`'foo'` ]");
+        expect_source_to_equal_ast("{ 123 }", "Tc[?=`123` ]");
+        expect_source_to_equal_ast("{ 'foo' }", "Tc[?=`'foo'` ]");
+        expect_source_to_equal_ast(
+            "{ ['fo'..'o'] = 'bar' }",
+            "Tc[[.. l=`'fo'` r=`'o'`]=`'bar'` ]",
+        );
+        expect_source_to_equal_ast(
+            "{ [1 + 2] = 'bar' }",
+            "Tc[[+ l=`1` r=`2`]=`'bar'` ]",
+        );
     }
 }
