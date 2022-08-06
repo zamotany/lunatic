@@ -27,7 +27,9 @@ impl<'s> Scanner<'s> {
             line: 1,
         }
     }
+}
 
+impl<'s> Scanner<'s> {
     fn is_eof(&self) -> bool {
         self.current >= self.source.chars().count()
     }
@@ -198,33 +200,8 @@ impl<'s> Scanner<'s> {
             "for" => self.add_token(TokenType::For, None),
             "do" => self.add_token(TokenType::Do, None),
             "in" => self.add_token(TokenType::In, None),
-            "if" => {
-                let elseif_replacement = match self.tokens.last() {
-                    Some(token) if token.token_type == TokenType::Else => {
-                        let lexeme = &self.source[token.lexeme_start..self.current];
-                        let token = Token::new(
-                            TokenType::Elseif,
-                            lexeme,
-                            token.lexeme_start,
-                            None,
-                            self.line,
-                        );
-                        Some(token)
-                    }
-                    _ => None,
-                };
-
-                match self.tokens.last_mut() {
-                    Some(token) if token.token_type == TokenType::Else => {
-                        if let Some(elseif_replacement) = elseif_replacement {
-                            *token = elseif_replacement;
-                        }
-                    }
-                    _ => {
-                        self.add_token(TokenType::If, None);
-                    }
-                };
-            }
+            "if" => self.add_token(TokenType::If, None),
+            "elseif" => self.add_token(TokenType::Elseif, None),
             "else" => self.add_token(TokenType::Else, None),
             "then" => self.add_token(TokenType::Then, None),
             "repeat" => self.add_token(TokenType::Repeat, None),
