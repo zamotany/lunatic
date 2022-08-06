@@ -50,7 +50,7 @@ impl<'p> Parser<'p> {
     fn is_token_of_type(&self, token_types: &[TokenType]) -> bool {
         match self.get_token() {
             Some(token) => {
-                for token_type in token_types  {
+                for token_type in token_types {
                     if &token.token_type == token_type {
                         return true;
                     }

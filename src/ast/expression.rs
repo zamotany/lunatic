@@ -1,5 +1,5 @@
+use super::table_constructor::TableConstructor;
 use crate::token::Token;
-use super::{field::Field, table_constructor::TableConstructor};
 
 #[derive(Debug)]
 pub enum Expression<'e> {
