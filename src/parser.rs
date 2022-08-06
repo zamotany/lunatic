@@ -1,10 +1,13 @@
 use crate::{
-    ast::expression::Expression,
+    ast::{
+        expression::Expression, field::Field, identifier::Identifier,
+        table_constructor::TableConstructor,
+    },
     token::{Token, TokenType},
 };
 use std::cell::RefCell;
 
-type ParsingResult<'e> = Result<Option<Expression<'e>>, String>;
+type ParsingResult<T> = Result<Option<T>, String>;
 
 /// Lua parser.
 ///
@@ -25,7 +28,7 @@ impl<'p> Parser<'p> {
         }
     }
 
-    pub fn parse(&self) -> ParsingResult {
+    pub fn parse(&self) -> ParsingResult<Expression> {
         self.parse_maybe_expression()
     }
 }
@@ -44,17 +47,40 @@ impl<'p> Parser<'p> {
         Some(&self.tokens[*self.current.borrow()])
     }
 
+    fn is_token_of_type(&self, token_types: &[TokenType]) -> bool {
+        match self.get_token() {
+            Some(token) => {
+                for token_type in token_types  {
+                    if &token.token_type == token_type {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            None => false,
+        }
+    }
+
+    fn assert_token(&self, token_type: TokenType, message: &str) -> Result<(), String> {
+        if !self.is_token_of_type(&[token_type]) {
+            return Err(String::from(message));
+        }
+
+        Ok(())
+    }
+
     /// Utility function to parse a binary expression.
     fn try_parse_binary_expression<M, L, R>(
         &self,
         matches_token: M,
         parse_left: L,
         parse_right: R,
-    ) -> ParsingResult
+    ) -> ParsingResult<Expression>
     where
         M: FnOnce(&TokenType) -> bool,
-        L: FnOnce() -> ParsingResult<'p>,
-        R: FnOnce() -> ParsingResult<'p>,
+        L: FnOnce() -> ParsingResult<Expression<'p>>,
+        R: FnOnce() -> ParsingResult<Expression<'p>>,
     {
         let left = parse_left()?;
         if left.is_none() {
@@ -81,23 +107,19 @@ impl<'p> Parser<'p> {
 
 /// Private parsing methods.
 impl<'p> Parser<'p> {
-    fn parse_maybe_expression(&self) -> ParsingResult {
+    fn parse_maybe_expression(&self) -> ParsingResult<Expression> {
         self.parse_maybe_spread()
     }
 
-    fn parse_maybe_spread(&self) -> ParsingResult {
+    fn parse_maybe_spread(&self) -> ParsingResult<Expression> {
         self.parse_maybe_function_definition()
     }
 
-    fn parse_maybe_function_definition(&self) -> ParsingResult {
-        self.parse_maybe_table_constructor()
-    }
-
-    fn parse_maybe_table_constructor(&self) -> ParsingResult {
+    fn parse_maybe_function_definition(&self) -> ParsingResult<Expression> {
         self.parse_maybe_binary_or()
     }
 
-    fn parse_maybe_binary_or(&self) -> ParsingResult {
+    fn parse_maybe_binary_or(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::Or,
             || self.parse_maybe_binary_and(),
@@ -105,7 +127,7 @@ impl<'p> Parser<'p> {
         )
     }
 
-    fn parse_maybe_binary_and(&self) -> ParsingResult {
+    fn parse_maybe_binary_and(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::And,
             || self.parse_maybe_binary_relation(),
@@ -113,25 +135,23 @@ impl<'p> Parser<'p> {
         )
     }
 
-    fn parse_maybe_binary_relation(&self) -> ParsingResult {
+    fn parse_maybe_binary_relation(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
-            |token_type| {
-                match token_type {
-                    TokenType::Less
-                    | TokenType::LessEqual
-                    | TokenType::Greater
-                    | TokenType::GreaterEqual
-                    | TokenType::TildeEqual
-                    | TokenType::EqualEqual => true,
-                    _ => false,
-                }
+            |token_type| match token_type {
+                TokenType::Less
+                | TokenType::LessEqual
+                | TokenType::Greater
+                | TokenType::GreaterEqual
+                | TokenType::TildeEqual
+                | TokenType::EqualEqual => true,
+                _ => false,
             },
             || self.parse_maybe_binary_bitwise_or(),
             || self.parse_maybe_binary_relation(),
         )
     }
 
-    fn parse_maybe_binary_bitwise_or(&self) -> ParsingResult {
+    fn parse_maybe_binary_bitwise_or(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::Pipe,
             || self.parse_maybe_binary_bitwise_xor(),
@@ -139,7 +159,7 @@ impl<'p> Parser<'p> {
         )
     }
 
-    fn parse_maybe_binary_bitwise_xor(&self) -> ParsingResult {
+    fn parse_maybe_binary_bitwise_xor(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::Tilde,
             || self.parse_maybe_binary_bitwise_and(),
@@ -147,7 +167,7 @@ impl<'p> Parser<'p> {
         )
     }
 
-    fn parse_maybe_binary_bitwise_and(&self) -> ParsingResult {
+    fn parse_maybe_binary_bitwise_and(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::Ampersand,
             || self.parse_maybe_binary_shift(),
@@ -155,20 +175,18 @@ impl<'p> Parser<'p> {
         )
     }
 
-    fn parse_maybe_binary_shift(&self) -> ParsingResult {
+    fn parse_maybe_binary_shift(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
-            |token_type| {
-                match token_type {
-                    TokenType::LessLess | TokenType::GreaterGreater => true,
-                    _ => false,
-                }
+            |token_type| match token_type {
+                TokenType::LessLess | TokenType::GreaterGreater => true,
+                _ => false,
             },
             || self.parse_maybe_binary_concat(),
             || self.parse_maybe_binary_shift(),
         )
     }
 
-    fn parse_maybe_binary_concat(&self) -> ParsingResult {
+    fn parse_maybe_binary_concat(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::DotDot,
             || self.parse_maybe_binary_arithmetic_simple(),
@@ -176,33 +194,31 @@ impl<'p> Parser<'p> {
         )
     }
 
-    fn parse_maybe_binary_arithmetic_simple(&self) -> ParsingResult {
+    fn parse_maybe_binary_arithmetic_simple(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
-            |token_type| {
-                match token_type {
-                    TokenType::Plus | TokenType::Minus => true,
-                    _ => false,
-                }
+            |token_type| match token_type {
+                TokenType::Plus | TokenType::Minus => true,
+                _ => false,
             },
             || self.parse_maybe_binary_arithmetic_complex(),
             || self.parse_maybe_binary_arithmetic_simple(),
         )
     }
 
-    fn parse_maybe_binary_arithmetic_complex(&self) -> ParsingResult {
+    fn parse_maybe_binary_arithmetic_complex(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
-            |token_type| {
-                match token_type {
-                    TokenType::Star | TokenType::Slash | TokenType::SlashSlash | TokenType::Percent => true,
-                    _ => false,
+            |token_type| match token_type {
+                TokenType::Star | TokenType::Slash | TokenType::SlashSlash | TokenType::Percent => {
+                    true
                 }
+                _ => false,
             },
             || self.parse_maybe_unary(),
             || self.parse_maybe_binary_arithmetic_complex(),
         )
     }
 
-    fn parse_maybe_unary(&self) -> ParsingResult {
+    fn parse_maybe_unary(&self) -> ParsingResult<Expression> {
         if let Some(token) = self.get_token() {
             return match token.token_type {
                 TokenType::Minus | TokenType::Not | TokenType::Hash | TokenType::Tilde => {
@@ -220,7 +236,7 @@ impl<'p> Parser<'p> {
         Ok(None)
     }
 
-    fn parse_maybe_binary_exponent(&self) -> ParsingResult {
+    fn parse_maybe_binary_exponent(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::Caret,
             || self.parse_maybe_prefix(),
@@ -228,7 +244,7 @@ impl<'p> Parser<'p> {
         )
     }
 
-    fn parse_maybe_prefix(&self) -> ParsingResult {
+    fn parse_maybe_prefix(&self) -> ParsingResult<Expression> {
         if let Some(token) = self.get_token() {
             return match token.token_type {
                 // TODO: var
@@ -242,6 +258,32 @@ impl<'p> Parser<'p> {
                         None => Err(String::from("Expected ')' after expression")),
                     }
                 }
+                _ => self.parse_maybe_table_constructor(),
+            };
+        }
+
+        Ok(None)
+    }
+
+    fn parse_maybe_table_constructor(&self) -> ParsingResult<Expression> {
+        if let Some(token) = self.get_token() {
+            return match token.token_type {
+                TokenType::LeftBrace => {
+                    self.advance_cursor();
+                    let field = self.parse_field()?;
+
+                    if self.is_token_of_type(&[TokenType::Comma, TokenType::Semicolon]) {
+                        self.advance_cursor();
+                    }
+
+                    self.assert_token(TokenType::RightBrace, "Expected '}' after field list")?;
+                    self.advance_cursor();
+
+                    match field {
+                        Some(field) => Ok(Some(TableConstructor::new_expression(vec![field]))),
+                        None => Ok(Some(TableConstructor::empty_expression())),
+                    }
+                }
                 _ => self.parse_maybe_literal(),
             };
         }
@@ -249,7 +291,45 @@ impl<'p> Parser<'p> {
         Ok(None)
     }
 
-    fn parse_maybe_literal(&self) -> ParsingResult {
+    fn parse_field(&self) -> ParsingResult<Field> {
+        if let Some(token) = self.get_token() {
+            if token.token_type == TokenType::LeftBracket {
+                // expression
+                todo!();
+            } else {
+                let key = self.parse_identifier()?;
+
+                self.assert_token(TokenType::Equal, "Expected '=' in field initialization")?;
+                self.advance_cursor();
+
+                let value = self.parse_maybe_expression()?;
+
+                if key.is_some() && value.is_some() {
+                    return Ok(Some(Field::new(key.unwrap(), value.unwrap())));
+                }
+
+                return Ok(None);
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn parse_identifier(&self) -> ParsingResult<Identifier> {
+        if let Some(token) = self.get_token() {
+            return match token.token_type {
+                TokenType::Identifier => {
+                    self.advance_cursor();
+                    Ok(Some(Identifier::new(token)))
+                }
+                _ => Ok(None),
+            };
+        }
+
+        Ok(None)
+    }
+
+    fn parse_maybe_literal(&self) -> ParsingResult<Expression> {
         if let Some(token) = self.get_token() {
             return match token.token_type {
                 TokenType::False
@@ -345,5 +425,10 @@ mod tests {
             "(1 ~= 2 or (true or 2 << 1 == 4)) and false and (true or false)",
             "[and l=([or l=[~= l=`1` r=`2`] r=([or l=`true` r=[== l=[<< l=`2` r=`1`] r=`4`]])]) r=[and l=`false` r=([or l=`true` r=`false`])]]"
         );
+    }
+
+    #[test]
+    fn should_parse_table_constructor() {
+        expect_source_to_equal_ast("{ foo = 1, }", "Tc[`foo`=`1` ]");
     }
 }

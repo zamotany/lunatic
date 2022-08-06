@@ -1,4 +1,5 @@
 use crate::token::Token;
+use super::{field::Field, table_constructor::TableConstructor};
 
 #[derive(Debug)]
 pub enum Expression<'e> {
@@ -6,6 +7,7 @@ pub enum Expression<'e> {
     Group(Box<Expression<'e>>),
     Unary(&'e Token<'e>, Box<Expression<'e>>),
     Binary(Box<Expression<'e>>, &'e Token<'e>, Box<Expression<'e>>),
+    TableConstructor(TableConstructor<'e>),
 }
 
 pub trait ExpressionVisitor {
@@ -20,6 +22,7 @@ pub trait ExpressionVisitor {
         operator: &Token,
         right: &Box<Expression>,
     ) -> Self::Output;
+    fn visit_table_constructor(&self, table_constructor: &TableConstructor) -> Self::Output;
 }
 
 impl<'a> Expression<'a> {
@@ -30,6 +33,9 @@ impl<'a> Expression<'a> {
             Expression::Unary(operator, right) => visitor.visit_unary(operator, right),
             Expression::Binary(left, operator, right) => {
                 visitor.visit_binary(left, operator, right)
+            }
+            Expression::TableConstructor(table_constructor) => {
+                visitor.visit_table_constructor(table_constructor)
             }
         }
     }

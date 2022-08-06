@@ -292,14 +292,14 @@ impl<'s> Scanner<'s> {
                                 return Err(error);
                             }
                         } else {
-                            self.add_token(TokenType::LeftBrace, None);
+                            self.add_token(TokenType::LeftBracket, None);
                         }
                     }
-                    ']' => self.add_token(TokenType::RightBrace, None),
+                    ']' => self.add_token(TokenType::RightBracket, None),
                     '(' => self.add_token(TokenType::LeftParen, None),
                     ')' => self.add_token(TokenType::RightParen, None),
-                    '{' => self.add_token(TokenType::LeftBracket, None),
-                    '}' => self.add_token(TokenType::RightBracket, None),
+                    '{' => self.add_token(TokenType::LeftBrace, None),
+                    '}' => self.add_token(TokenType::RightBrace, None),
                     '\'' | '"' => {
                         if let Err(error) = self.scan_literal_string() {
                             return Err(error);

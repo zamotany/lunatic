@@ -1,4 +1,4 @@
-use crate::{ast::expression::{ExpressionVisitor, Expression}, token::Token};
+use crate::{ast::{expression::{ExpressionVisitor, Expression}, table_constructor::TableConstructor}, token::Token};
 
 pub struct DebugVisitor {
 }
@@ -31,5 +31,13 @@ impl ExpressionVisitor for DebugVisitor {
         right: &Box<Expression>,
     ) -> String {
         format!("[{} l={} r={}]", operator.lexeme, left.visit(self), right.visit(self))
+    }
+
+    fn visit_table_constructor(&self, table_constructor: &TableConstructor) -> String {
+        let mut fields_string = String::new();
+        for field in table_constructor.fields.iter() {
+            fields_string.push_str(&format!("`{}`={} ", field.key.token.lexeme, field.value.visit(self))[..]);
+        }
+        format!("Tc[{}]", fields_string)
     }
 }

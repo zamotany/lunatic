@@ -28,7 +28,7 @@ mod visitor;
 // ";
 
 fn main() {
-    let mut scanner = scanner::Scanner::new("true or (false and true) and true");
+    let mut scanner = scanner::Scanner::new("{ foo = 1, }");
 		match scanner.scan_tokens() {
 			Ok(tokens) => {
                 match Parser::new(tokens).parse() {
