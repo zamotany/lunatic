@@ -100,12 +100,12 @@ impl<'s> Scanner<'s> {
     }
 
     fn scan_literal_string(&mut self) -> Result<(), String> {
-        match self.char_at(self.current) {
+        match self.char_at(self.current - 1) {
             Some(delimiter) => {
                 while !self.is_eof()
-                    && (self.char_at(self.current + 1) != Some(delimiter)
+                    && (self.char_at(self.current) != Some(delimiter)
                         || self.char_at(self.current) == Some('\\'))
-                    && self.char_at(self.current + 1) != Some('\n')
+                    && self.char_at(self.current) != Some('\n')
                 {
                     self.advance_cursor(1);
                 }
@@ -475,6 +475,28 @@ mod tests {
                 Token::new(TokenType::Eof, "", 7, None, 1),
             ])
         );
+    }
 
+    #[test]
+    fn should_scan_concatenation() {
+        assert_eq!(
+            Scanner::new("'hello ' .. 'world'").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::LiteralString, "'hello '", 0, Some("hello "), 1),
+                Token::new(TokenType::DotDot, "..", 9, None, 1),
+                Token::new(TokenType::LiteralString, "'world'", 12, Some("world"), 1),
+                Token::new(TokenType::Eof, "", 19, None, 1)
+            ])
+        );
+
+        assert_eq!(
+            Scanner::new("\"hello \" .. 'world'").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::LiteralString, "\"hello \"", 0, Some("hello "), 1),
+                Token::new(TokenType::DotDot, "..", 9, None, 1),
+                Token::new(TokenType::LiteralString, "'world'", 12, Some("world"), 1),
+                Token::new(TokenType::Eof, "", 19, None, 1)
+            ])
+        );
     }
 }
