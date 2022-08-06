@@ -270,19 +270,24 @@ impl<'p> Parser<'p> {
             return match token.token_type {
                 TokenType::LeftBrace => {
                     self.advance_cursor();
-                    let field = self.parse_field()?;
 
-                    if self.is_token_of_type(&[TokenType::Comma, TokenType::Semicolon]) {
-                        self.advance_cursor();
+                    let mut fields = Vec::new();
+                    while !self.is_token_of_type(&[TokenType::RightBrace]) {
+                        if let Some(field) = self.parse_field()? {
+                            fields.push(field);
+                        } else {
+                            break;
+                        }
+
+                        if self.is_token_of_type(&[TokenType::Comma, TokenType::Semicolon]) {
+                            self.advance_cursor();
+                        }
                     }
 
                     self.assert_token(TokenType::RightBrace, "Expected '}' after field list")?;
                     self.advance_cursor();
 
-                    match field {
-                        Some(field) => Ok(Some(TableConstructor::new_expression(vec![field]))),
-                        None => Ok(Some(TableConstructor::empty_expression())),
-                    }
+                    Ok(Some(TableConstructor::new_expression(fields)))
                 }
                 _ => self.parse_maybe_literal(),
             };
@@ -312,10 +317,14 @@ impl<'p> Parser<'p> {
 
                         match self.parse_maybe_expression()? {
                             Some(value) => Ok(Some(Field::Expression(key, value))),
-                            None => Ok(None),
+                            None => Err(String::from(
+                                "Failed to parse value expression in field of table constructor",
+                            )),
                         }
                     }
-                    None => Ok(None),
+                    None => Err(String::from(
+                        "Failed to parse key expression in field of table constructor",
+                    )),
                 };
             } else {
                 return match self.parse_identifier()? {
@@ -328,7 +337,9 @@ impl<'p> Parser<'p> {
 
                         match self.parse_maybe_expression()? {
                             Some(value) => Ok(Some(Field::Normal(key, value))),
-                            None => Ok(None),
+                            None => Err(String::from(
+                                "Failed to parse value expression in field of table constructor",
+                            )),
                         }
                     }
                     None if !self.is_token_of_type(&[TokenType::Equal]) => {
@@ -337,7 +348,7 @@ impl<'p> Parser<'p> {
                             None => Ok(None),
                         }
                     }
-                    _ => Ok(None),
+                    _ => Err(String::from("Failed to parse field of table constructor")),
                 };
             }
         }
@@ -461,14 +472,22 @@ mod tests {
     fn should_parse_table_constructor() {
         expect_source_to_equal_ast("{ foo = 1, }", "Tc[`foo`=`1` ]");
         expect_source_to_equal_ast("{ 123 }", "Tc[?=`123` ]");
+        expect_source_to_equal_ast("{ }", "Tc[]");
         expect_source_to_equal_ast("{ 'foo' }", "Tc[?=`'foo'` ]");
         expect_source_to_equal_ast(
             "{ ['fo'..'o'] = 'bar' }",
             "Tc[[.. l=`'fo'` r=`'o'`]=`'bar'` ]",
         );
+        expect_source_to_equal_ast("{ [1 + 2] = 'bar' }", "Tc[[+ l=`1` r=`2`]=`'bar'` ]");
+        expect_source_to_equal_ast("{ 1, 2, 3 }", "Tc[?=`1` ?=`2` ?=`3` ]");
+        expect_source_to_equal_ast("{ foo = 1, bar = 2; }", "Tc[`foo`=`1` `bar`=`2` ]");
         expect_source_to_equal_ast(
-            "{ [1 + 2] = 'bar' }",
-            "Tc[[+ l=`1` r=`2`]=`'bar'` ]",
+            "{ [1 + 2] = 'bar', ['1'..'2'] = 'foo' }",
+            "Tc[[+ l=`1` r=`2`]=`'bar'` [.. l=`'1'` r=`'2'`]=`'foo'` ]",
+        );
+        expect_source_to_equal_ast(
+            "{ 'hello'; [1 + 2] = 'bar'; foo = 1; }",
+            "Tc[?=`'hello'` [+ l=`1` r=`2`]=`'bar'` `foo`=`1` ]",
         );
     }
 }
