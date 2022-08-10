@@ -1,11 +1,7 @@
 use crate::{
     ast::{
-        expression::Expression,
-        field::Field,
-        identifier::Identifier,
-        prefix::Prefix,
-        table_constructor::TableConstructor,
-        variable::Variable,
+        expression::Expression, field::Field, identifier::Identifier, prefix::Prefix,
+        table_constructor::TableConstructor, variable::Variable,
     },
     token::{Token, TokenType},
 };
@@ -243,38 +239,60 @@ impl<'p> Parser<'p> {
     fn parse_maybe_binary_exponent(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::Caret,
-            || self.parse_maybe_var_expression_access(),
+            || self.parse_maybe_var_access(),
             || self.parse_maybe_binary_exponent(),
         )
     }
 
-    fn parse_maybe_var_expression_access(&self) -> ParsingResult<Expression> {
-        self.parse_maybe_var_member_access()
-    }
-
-    fn parse_maybe_var_member_access(&self) -> ParsingResult<Expression> {
+    fn parse_maybe_var_access(&self) -> ParsingResult<Expression> {
         match self.parse_maybe_var_identifier()? {
             Some(Expression::Prefix(prefix)) => {
                 let mut current_prefix = prefix;
                 let mut error: Result<(), String> = Result::Ok(());
 
                 while let Some(token) = self.get_token() {
-                    if token.token_type == TokenType::Dot {
-                        self.advance_cursor();
+                    match token.token_type {
+                        TokenType::LeftBracket => {
+                            self.advance_cursor();
 
-                        match self.parse_identifier()? {
-                            Some(identifier) => {
-                                current_prefix = Prefix::Variable(
-                                    Variable::MemberAccess(Box::new(current_prefix), identifier),
-                                )
-                            },
-                            None => {
-                                error = Err(String::from("Expected identifier after `.`"));
-                                break;
-                            }
-                        };
-                    } else {
-                        break;
+                            match self.parse_maybe_expression()? {
+                                Some(expression) => {
+                                    current_prefix = Prefix::Variable(Variable::ExpressionAccess(
+                                        Box::new(current_prefix),
+                                        Box::new(expression),
+                                    ))
+                                }
+                                None => {
+                                    error = Err(String::from("Expected identifier after `.`"));
+                                    break;
+                                }
+                            };
+
+                            self.assert_token(
+                                TokenType::RightBracket,
+                                "Expected `]` after expression",
+                            )?;
+                            self.advance_cursor();
+                        }
+                        TokenType::Dot => {
+                            self.advance_cursor();
+
+                            match self.parse_identifier()? {
+                                Some(identifier) => {
+                                    current_prefix = Prefix::Variable(Variable::MemberAccess(
+                                        Box::new(current_prefix),
+                                        identifier,
+                                    ))
+                                }
+                                None => {
+                                    error = Err(String::from("Expected identifier after `.`"));
+                                    break;
+                                }
+                            };
+                        }
+                        _ => {
+                            break;
+                        }
                     }
                 }
 
@@ -283,13 +301,12 @@ impl<'p> Parser<'p> {
                 }
 
                 Ok(Some(Expression::Prefix(current_prefix)))
-            },
+            }
             expression => Ok(expression),
-
         }
     }
 
-    fn parse_maybe_var_identifier(&self) -> ParsingResult<Expression>  {
+    fn parse_maybe_var_identifier(&self) -> ParsingResult<Expression> {
         if let Some(token) = self.get_token() {
             return match token.token_type {
                 TokenType::Identifier => {
@@ -538,6 +555,10 @@ mod tests {
             "{ foo = 1, bar = 2 } and true",
             "[and l=Tc[`foo`=`1` `bar`=`2` ] r=`true`]",
         );
+        expect_source_to_equal_ast(
+            "foo.baz or foo[1 + 2].baz",
+            "[or l=foo.baz r=foo[[+ l=`1` r=`2`]].baz]",
+        );
     }
 
     #[test]
@@ -577,5 +598,11 @@ mod tests {
         expect_source_to_equal_ast("foo.baz.bar", "foo.baz.bar");
         expect_source_to_equal_ast("foo.baz.bar.qoo", "foo.baz.bar.qoo");
         expect_source_to_equal_ast("(foo or baz).bar.qoo", "([or l=foo r=baz]).bar.qoo");
+        expect_source_to_equal_ast("foo[bar]", "foo[bar]");
+        expect_source_to_equal_ast("foo.baz[bar]", "foo.baz[bar]");
+        expect_source_to_equal_ast("foo[1 + 2]", "foo[[+ l=`1` r=`2`]]");
+        expect_source_to_equal_ast("foo.baz[1 + 2]", "foo.baz[[+ l=`1` r=`2`]]");
+        expect_source_to_equal_ast("foo[1 + 2][3 + 4]", "foo[[+ l=`1` r=`2`]][[+ l=`3` r=`4`]]");
+        expect_source_to_equal_ast("foo[1 + 2].bar", "foo[[+ l=`1` r=`2`]].bar");
     }
 }

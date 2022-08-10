@@ -67,7 +67,9 @@ impl ExpressionVisitor for DebugVisitor {
                 Variable::MemberAccess(prefix, identifier) => {
                     format!("{}.{}", self.visit_prefix(prefix), identifier.token.lexeme)
                 }
-                _ => String::from("TODO"),
+                Variable::ExpressionAccess(prefix, expression) => {
+                    format!("{}[{}]", self.visit_prefix(prefix), expression.visit(self))
+                }
             },
         }
     }
