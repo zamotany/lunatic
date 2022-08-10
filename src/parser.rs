@@ -1,7 +1,11 @@
 use crate::{
     ast::{
-        expression::Expression, field::Field, identifier::Identifier, prefix::Prefix,
+        expression::Expression,
+        field::Field,
+        identifier::Identifier,
+        prefix::Prefix,
         table_constructor::TableConstructor,
+        variable::Variable,
     },
     token::{Token, TokenType},
 };
@@ -239,15 +243,77 @@ impl<'p> Parser<'p> {
     fn parse_maybe_binary_exponent(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::Caret,
-            || self.parse_maybe_prefix(),
+            || self.parse_maybe_var_expression_access(),
             || self.parse_maybe_binary_exponent(),
         )
+    }
+
+    fn parse_maybe_var_expression_access(&self) -> ParsingResult<Expression> {
+        self.parse_maybe_var_member_access()
+    }
+
+    fn parse_maybe_var_member_access(&self) -> ParsingResult<Expression> {
+        match self.parse_maybe_var_identifier()? {
+            Some(Expression::Prefix(prefix)) => {
+                let mut current_prefix = prefix;
+                let mut error: Result<(), String> = Result::Ok(());
+
+                while let Some(token) = self.get_token() {
+                    if token.token_type == TokenType::Dot {
+                        self.advance_cursor();
+
+                        match self.parse_identifier()? {
+                            Some(identifier) => {
+                                current_prefix = Prefix::Variable(
+                                    Variable::MemberAccess(Box::new(current_prefix), identifier),
+                                )
+                            },
+                            None => {
+                                error = Err(String::from("Expected identifier after `.`"));
+                                break;
+                            }
+                        };
+                    } else {
+                        break;
+                    }
+                }
+
+                if error.is_err() {
+                    return Err(error.unwrap_err());
+                }
+
+                Ok(Some(Expression::Prefix(current_prefix)))
+            },
+            expression => Ok(expression),
+
+        }
+    }
+
+    fn parse_maybe_var_identifier(&self) -> ParsingResult<Expression>  {
+        if let Some(token) = self.get_token() {
+            return match token.token_type {
+                TokenType::Identifier => {
+                    self.advance_cursor();
+                    return Ok(Some(Expression::Prefix(Prefix::Variable(
+                        Variable::Identifier(Identifier::new(token)),
+                    ))));
+                }
+                _ => self.parse_maybe_prefix(),
+            };
+        }
+
+        Ok(None)
     }
 
     fn parse_maybe_prefix(&self) -> ParsingResult<Expression> {
         if let Some(token) = self.get_token() {
             return match token.token_type {
-                // TODO: var
+                TokenType::Identifier => {
+                    self.advance_cursor();
+                    return Ok(Some(Expression::Prefix(Prefix::Variable(
+                        Variable::Identifier(Identifier::new(token)),
+                    ))));
+                }
                 // TODO: functioncall
                 TokenType::LeftParen => {
                     self.advance_cursor();
@@ -495,5 +561,21 @@ mod tests {
             "{ 'hello'; [1 + 2] = 'bar'; foo = 1; }",
             "Tc[?=`'hello'` [+ l=`1` r=`2`]=`'bar'` `foo`=`1` ]",
         );
+        expect_source_to_equal_ast(
+            "{ foo = { bar = 1 }, baz = {} }",
+            "Tc[`foo`=Tc[`bar`=`1` ] `baz`=Tc[] ]",
+        );
+    }
+
+    #[test]
+    fn should_parse_variables() {
+        expect_source_to_equal_ast("foo", "foo");
+        expect_source_to_equal_ast("foo == true", "[== l=foo r=`true`]");
+        expect_source_to_equal_ast("foo.bar", "foo.bar");
+        expect_source_to_equal_ast("(foo).bar", "(foo).bar");
+        expect_source_to_equal_ast("(foo or baz).bar", "([or l=foo r=baz]).bar");
+        expect_source_to_equal_ast("foo.baz.bar", "foo.baz.bar");
+        expect_source_to_equal_ast("foo.baz.bar.qoo", "foo.baz.bar.qoo");
+        expect_source_to_equal_ast("(foo or baz).bar.qoo", "([or l=foo r=baz]).bar.qoo");
     }
 }

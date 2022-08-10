@@ -4,6 +4,7 @@ use crate::{
         field::Field,
         prefix::Prefix,
         table_constructor::TableConstructor,
+        variable::Variable,
     },
     token::Token,
 };
@@ -58,10 +59,16 @@ impl ExpressionVisitor for DebugVisitor {
         format!("Tc[{}]", fields_string)
     }
 
-    fn visit_prefix(&self, prefix: &crate::ast::prefix::Prefix) -> String {
+    fn visit_prefix(&self, prefix: &Prefix) -> String {
         match prefix {
             Prefix::Group(expression) => format!("({})", expression.visit(self)),
-            Prefix::Variable(_) => String::new(),
+            Prefix::Variable(variable) => match variable {
+                Variable::Identifier(identifier) => format!("{}", identifier.token.lexeme),
+                Variable::MemberAccess(prefix, identifier) => {
+                    format!("{}.{}", self.visit_prefix(prefix), identifier.token.lexeme)
+                }
+                _ => String::from("TODO"),
+            },
         }
     }
 }
