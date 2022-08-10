@@ -39,7 +39,7 @@ impl<'s> Scanner<'s> {
     }
 
     fn is_alpha(&self, char: char) -> bool {
-        (char >= 'A' && char <= 'z') || char == '_'
+        (char >= 'A' && char <= 'Z') || (char >= 'a' && char <= 'z') || char == '_'
     }
 
     fn is_alphanumeric(&self, char: char) -> bool {
@@ -473,6 +473,20 @@ mod tests {
                 Token::new(TokenType::DotDot, "..", 9, None, 1),
                 Token::new(TokenType::LiteralString, "'world'", 12, Some("world"), 1),
                 Token::new(TokenType::Eof, "", 19, None, 1)
+            ])
+        );
+    }
+
+    #[test]
+    fn should_scan_vars() {
+        assert_eq!(
+            Scanner::new("foo[bar]").scan_tokens(),
+            Ok(&vec![
+                Token::new(TokenType::Identifier, "foo", 0, None, 1),
+                Token::new(TokenType::LeftBracket, "[", 3, None, 1),
+                Token::new(TokenType::Identifier, "bar", 4, None, 1),
+                Token::new(TokenType::RightBracket, "]", 7, None, 1),
+                Token::new(TokenType::Eof, "", 8, None, 1),
             ])
         );
     }
