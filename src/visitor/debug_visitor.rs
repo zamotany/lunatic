@@ -1,25 +1,52 @@
 use crate::{
     ast::{
-        expression::{Expression, ExpressionVisitor},
-        field::Field,
-        prefix::Prefix,
-        table_constructor::TableConstructor,
-        variable::Variable,
+        Expression, ExpressionVisitor, Field, FieldVisitor, Identifier, Prefix, PrefixVisitor,
+        VariableVisitor,
     },
     token::Token,
 };
 
-pub struct DebugVisitor {}
+pub struct DebugVisitor;
 
-impl DebugVisitor {
-    pub fn new() -> DebugVisitor {
-        DebugVisitor {}
+impl PrefixVisitor<String> for DebugVisitor {
+    fn visit_prefix_group(&self, expression: &Box<Expression>) -> String {
+        format!("({})", expression.visit(self))
     }
 }
 
-impl ExpressionVisitor for DebugVisitor {
-    type Output = String;
+impl VariableVisitor<String> for DebugVisitor {
+    fn visit_variable_identifier(&self, identifier: &Identifier) -> String {
+        format!("{}", identifier.0.lexeme)
+    }
 
+    fn visit_variable_member_access(&self, reference: &Box<Prefix>, member: &Identifier) -> String {
+        format!("{}.{}", reference.visit(self), member.0.lexeme)
+    }
+
+    fn visit_variable_expression_member_access(
+        &self,
+        reference: &Box<Prefix>,
+        member: &Box<Expression>,
+    ) -> String {
+        format!("{}[{}]", reference.visit(self), member.visit(self))
+    }
+}
+
+impl FieldVisitor<String> for DebugVisitor {
+    fn visit_field_expression(&self, key: &Expression, value: &Expression) -> String {
+        format!("{}={} ", key.visit(self), value.visit(self))
+    }
+
+    fn visit_field_normal(&self, key: &Identifier, value: &Expression) -> String {
+        format!("`{}`={} ", key.0.lexeme, value.visit(self))
+    }
+
+    fn visit_field_anonymous(&self, value: &Expression) -> String {
+        format!("?={} ", value.visit(self))
+    }
+}
+
+impl ExpressionVisitor<String> for DebugVisitor {
     fn visit_literal(&self, token: &Token) -> String {
         format!("`{}`", token.lexeme)
     }
@@ -42,35 +69,11 @@ impl ExpressionVisitor for DebugVisitor {
         )
     }
 
-    fn visit_table_constructor(&self, table_constructor: &TableConstructor) -> String {
+    fn visit_table_constructor(&self, fields: &Vec<Field>) -> String {
         let mut fields_string = String::new();
-        for field in table_constructor.fields.iter() {
-            let field_string = match field {
-                Field::Anonymous(value) => format!("?={} ", value.visit(self)),
-                Field::Expression(key, value) => {
-                    format!("{}={} ", key.visit(self), value.visit(self))
-                }
-                Field::Normal(key, value) => {
-                    format!("`{}`={} ", key.token.lexeme, value.visit(self))
-                }
-            };
-            fields_string.push_str(&field_string[..]);
+        for field in fields.iter() {
+            fields_string.push_str(&field.visit(self)[..]);
         }
         format!("Tc[{}]", fields_string)
-    }
-
-    fn visit_prefix(&self, prefix: &Prefix) -> String {
-        match prefix {
-            Prefix::Group(expression) => format!("({})", expression.visit(self)),
-            Prefix::Variable(variable) => match variable {
-                Variable::Identifier(identifier) => format!("{}", identifier.token.lexeme),
-                Variable::MemberAccess(prefix, identifier) => {
-                    format!("{}.{}", self.visit_prefix(prefix), identifier.token.lexeme)
-                }
-                Variable::ExpressionAccess(prefix, expression) => {
-                    format!("{}[{}]", self.visit_prefix(prefix), expression.visit(self))
-                }
-            },
-        }
     }
 }

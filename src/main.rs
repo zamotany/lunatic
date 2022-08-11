@@ -32,7 +32,7 @@ fn main() {
     match scanner.scan_tokens() {
         Ok(tokens) => match Parser::new(tokens).parse() {
             Ok(Some(expression)) => {
-                let debug_visitor = debug_visitor::DebugVisitor::new();
+                let debug_visitor = debug_visitor::DebugVisitor;
                 let output = expression.visit(&debug_visitor);
                 println!("{}", output);
             }
