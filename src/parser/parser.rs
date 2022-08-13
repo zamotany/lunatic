@@ -1,7 +1,8 @@
+use super::parsing_error::ParsingError;
 use crate::{ast::Expression, token::Token};
 use std::cell::RefCell;
 
-pub type ParsingResult<T> = Result<T, String>;
+pub type ParsingResult<'a, T> = Result<T, ParsingError<'a>>;
 
 /// Lua parser.
 ///

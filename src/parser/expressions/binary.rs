@@ -14,8 +14,8 @@ impl<'p> Parser<'p> {
     ) -> ParsingResult<Expression>
     where
         M: FnOnce(&TokenType) -> bool,
-        L: FnOnce() -> ParsingResult<Expression<'p>>,
-        R: FnOnce() -> ParsingResult<Expression<'p>>,
+        L: FnOnce() -> ParsingResult<'p, Expression<'p>>,
+        R: FnOnce() -> ParsingResult<'p, Expression<'p>>,
     {
         let left = parse_left()?;
 
@@ -27,7 +27,7 @@ impl<'p> Parser<'p> {
                     left: Box::new(left),
                     operator: token,
                     right: Box::new(right),
-                })
+                });
             }
         }
 

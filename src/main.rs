@@ -37,7 +37,7 @@ fn main() {
                 println!("{}", output);
             }
             Err(error) => {
-                println!("Error parsing: {}", error);
+                println!("Error parsing: {:?}", error);
             }
         },
         Err(error) => {

@@ -1,6 +1,6 @@
 use crate::{
     ast::Expression,
-    parser::{Parser, ParsingResult},
+    parser::{parsing_error::ParsingError, Parser, ParsingResult},
     token::TokenType,
 };
 
@@ -20,6 +20,6 @@ impl<'p> Parser<'p> {
             };
         }
 
-        Err(String::from("Unexpected end of tokens"))
+        ParsingError::end_of_tokens(self.get_last_token())
     }
 }

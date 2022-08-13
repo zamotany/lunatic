@@ -1,6 +1,6 @@
 use crate::{
     ast::{Expression, Field},
-    parser::{Parser, ParsingResult},
+    parser::{parsing_error::ParsingError, Parser, ParsingResult},
     token::TokenType,
 };
 
@@ -30,7 +30,7 @@ impl<'p> Parser<'p> {
             };
         }
 
-        Err(String::from("Unexpected end of tokens"))
+        ParsingError::end_of_tokens(self.get_last_token())
     }
 
     fn parse_field(&self) -> ParsingResult<Field> {
@@ -46,10 +46,7 @@ impl<'p> Parser<'p> {
                 )?;
                 self.advance_cursor();
 
-                self.assert_token(
-                    TokenType::Equal,
-                    "Expected '=' in field initialization",
-                )?;
+                self.assert_token(TokenType::Equal, "Expected '=' in field initialization")?;
                 self.advance_cursor();
 
                 let value = self.parse_maybe_expression()?;
@@ -70,11 +67,14 @@ impl<'p> Parser<'p> {
                         let value = self.parse_maybe_expression()?;
                         Ok(Field::Anonymous { value })
                     }
-                    _ => Err(String::from("Failed to parse field of table constructor")),
+                    _ => ParsingError::new(
+                        "Failed to parse field of table constructor",
+                        self.get_token().unwrap_or(self.get_last_token()),
+                    ),
                 };
             }
         }
 
-        Err(String::from("Unexpected end of tokens"))
+        ParsingError::end_of_tokens(self.get_last_token())
     }
 }

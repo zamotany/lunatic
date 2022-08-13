@@ -1,6 +1,7 @@
 mod expressions;
 mod parser;
 mod parser_utils;
+mod parsing_error;
 
 pub use parser::*;
 

@@ -1,6 +1,6 @@
 use crate::{
     ast::{Expression, Identifier, Prefix, Variable},
-    parser::{Parser, ParsingResult},
+    parser::{parsing_error::ParsingError, Parser, ParsingResult},
     token::TokenType,
 };
 
@@ -9,7 +9,7 @@ impl<'p> Parser<'p> {
         match self.parse_maybe_var_identifier()? {
             Expression::Prefix(prefix) => {
                 let mut current_prefix = prefix;
-                let mut error: Result<(), String> = Result::Ok(());
+                let mut error: ParsingResult<()> = Result::Ok(());
 
                 while let Some(token) = self.get_token() {
                     match token.token_type {
@@ -39,7 +39,10 @@ impl<'p> Parser<'p> {
                                     })
                                 }
                                 None => {
-                                    error = Err(String::from("Expected identifier after `.`"));
+                                    error = ParsingError::new(
+                                        "Expected identifier after `.`",
+                                        self.get_token().unwrap_or(self.get_last_token()),
+                                    );
                                     break;
                                 }
                             };
@@ -73,6 +76,6 @@ impl<'p> Parser<'p> {
             };
         }
 
-        Err(String::from("Unexpected end of tokens"))
+        ParsingError::end_of_tokens(self.get_last_token())
     }
 }

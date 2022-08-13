@@ -1,7 +1,5 @@
-use crate::{
-    parser::Parser,
-    token::{Token, TokenType},
-};
+use super::{parsing_error::ParsingError, Parser, ParsingResult};
+use crate::token::{Token, TokenType};
 
 impl<'p> Parser<'p> {
     pub(super) fn advance_cursor(&self) {
@@ -14,6 +12,10 @@ impl<'p> Parser<'p> {
         }
 
         Some(&self.tokens[*self.current.borrow()])
+    }
+
+    pub(super) fn get_last_token(&self) -> &Token {
+        &self.tokens.last().unwrap()
     }
 
     pub(super) fn is_token_of_type(&self, token_types: &[TokenType]) -> bool {
@@ -31,9 +33,13 @@ impl<'p> Parser<'p> {
         }
     }
 
-    pub(super) fn assert_token(&self, token_type: TokenType, message: &str) -> Result<(), String> {
+    pub(super) fn assert_token(
+        &'p self,
+        token_type: TokenType,
+        message: &'p str,
+    ) -> ParsingResult<'p, ()> {
         if !self.is_token_of_type(&[token_type]) {
-            return Err(String::from(message));
+            return ParsingError::new(message, self.get_token().unwrap_or(self.get_last_token()));
         }
 
         Ok(())
