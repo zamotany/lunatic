@@ -10,26 +10,24 @@ impl<'p> Parser<'p> {
             return match token.token_type {
                 TokenType::Identifier => {
                     self.advance_cursor();
-                    return Ok(Some(Expression::Prefix(Prefix::Variable(
-                        Variable::Identifier(Identifier(token)),
+                    return Ok(Expression::Prefix(Prefix::Variable(Variable::Identifier(
+                        Identifier(token),
                     ))));
                 }
                 // TODO: functioncall
                 TokenType::LeftParen => {
                     self.advance_cursor();
                     let expression = self.parse_maybe_expression()?;
+                    self.assert_token(TokenType::RightParen, "Expected `)` after expression")?;
                     self.advance_cursor();
-                    match expression {
-                        Some(expression) => Ok(Some(Expression::Prefix(Prefix::Group(Box::new(
-                            expression,
-                        ))))),
-                        None => Err(String::from("Expected ')' after expression")),
-                    }
+                    Ok(Expression::Prefix(Prefix::Group(Box::new(
+                        expression,
+                    ))))
                 }
                 _ => self.parse_maybe_table_constructor(),
             };
         }
 
-        Ok(None)
+        Err(String::from("Unexpected end of tokens"))
     }
 }

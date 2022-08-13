@@ -1,7 +1,7 @@
 use crate::{ast::Expression, token::Token};
 use std::cell::RefCell;
 
-pub type ParsingResult<T> = Result<Option<T>, String>;
+pub type ParsingResult<T> = Result<T, String>;
 
 /// Lua parser.
 ///

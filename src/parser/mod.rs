@@ -13,7 +13,7 @@ mod tests {
         let mut scanner = scanner::Scanner::new(source);
         let tokens = scanner.scan_tokens().unwrap();
         let parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap().unwrap();
+        let ast = parser.parse().unwrap();
         let debug_visitor = debug_visitor::DebugVisitor;
         let output = ast.visit(&debug_visitor);
         assert_eq!(&output[..], expected);

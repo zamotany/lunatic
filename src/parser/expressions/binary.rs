@@ -18,21 +18,16 @@ impl<'p> Parser<'p> {
         R: FnOnce() -> ParsingResult<Expression<'p>>,
     {
         let left = parse_left()?;
-        if left.is_none() {
-            return Ok(None);
-        }
 
         if let Some(token) = self.get_token() {
             if matches_token(&token.token_type) {
                 self.advance_cursor();
-                return match parse_right()? {
-                    Some(right) => Ok(Some(Expression::Binary {
-                        left: Box::new(left.unwrap()),
-                        operator: token,
-                        right: Box::new(right),
-                    })),
-                    None => Err(String::from("Failed to parse operand of binary expression")),
-                };
+                let right = parse_right()?;
+                return Ok(Expression::Binary {
+                    left: Box::new(left),
+                    operator: token,
+                    right: Box::new(right),
+                })
             }
         }
 

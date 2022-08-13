@@ -31,13 +31,10 @@ fn main() {
     let mut scanner = scanner::Scanner::new("foo[bar]");
     match scanner.scan_tokens() {
         Ok(tokens) => match Parser::new(tokens).parse() {
-            Ok(Some(expression)) => {
+            Ok(expression) => {
                 let debug_visitor = debug_visitor::DebugVisitor;
                 let output = expression.visit(&debug_visitor);
                 println!("{}", output);
-            }
-            Ok(None) => {
-                println!("Parsing results were None");
             }
             Err(error) => {
                 println!("Error parsing: {}", error);

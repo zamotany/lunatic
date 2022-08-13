@@ -7,7 +7,7 @@ use crate::{
 impl<'p> Parser<'p> {
     pub(super) fn parse_maybe_var_access(&self) -> ParsingResult<Expression> {
         match self.parse_maybe_var_identifier()? {
-            Some(Expression::Prefix(prefix)) => {
+            Expression::Prefix(prefix) => {
                 let mut current_prefix = prefix;
                 let mut error: Result<(), String> = Result::Ok(());
 
@@ -16,19 +16,11 @@ impl<'p> Parser<'p> {
                         TokenType::LeftBracket => {
                             self.advance_cursor();
 
-                            match self.parse_maybe_expression()? {
-                                Some(expression) => {
-                                    current_prefix =
-                                        Prefix::Variable(Variable::ExpressionMemberAccess {
-                                            reference: Box::new(current_prefix),
-                                            member: Box::new(expression),
-                                        })
-                                }
-                                None => {
-                                    error = Err(String::from("Expected identifier after `.`"));
-                                    break;
-                                }
-                            };
+                            let expression = self.parse_maybe_expression()?;
+                            current_prefix = Prefix::Variable(Variable::ExpressionMemberAccess {
+                                reference: Box::new(current_prefix),
+                                member: Box::new(expression),
+                            });
 
                             self.assert_token(
                                 TokenType::RightBracket,
@@ -39,7 +31,7 @@ impl<'p> Parser<'p> {
                         TokenType::Dot => {
                             self.advance_cursor();
 
-                            match self.parse_identifier()? {
+                            match self.try_parse_identifier()? {
                                 Some(identifier) => {
                                     current_prefix = Prefix::Variable(Variable::MemberAccess {
                                         reference: Box::new(current_prefix),
@@ -62,7 +54,7 @@ impl<'p> Parser<'p> {
                     return Err(error.unwrap_err());
                 }
 
-                Ok(Some(Expression::Prefix(current_prefix)))
+                Ok(Expression::Prefix(current_prefix))
             }
             expression => Ok(expression),
         }
@@ -73,14 +65,14 @@ impl<'p> Parser<'p> {
             return match token.token_type {
                 TokenType::Identifier => {
                     self.advance_cursor();
-                    return Ok(Some(Expression::Prefix(Prefix::Variable(
-                        Variable::Identifier(Identifier(token)),
+                    return Ok(Expression::Prefix(Prefix::Variable(Variable::Identifier(
+                        Identifier(token),
                     ))));
                 }
                 _ => self.parse_maybe_prefix(),
             };
         }
 
-        Ok(None)
+        Err(String::from("Unexpected end of tokens"))
     }
 }

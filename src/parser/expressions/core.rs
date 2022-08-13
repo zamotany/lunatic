@@ -4,7 +4,6 @@ use crate::{
     token::TokenType,
 };
 
-
 impl<'p> Parser<'p> {
     pub(super) fn parse_maybe_spread(&self) -> ParsingResult<Expression> {
         self.parse_maybe_function_definition()
@@ -14,7 +13,7 @@ impl<'p> Parser<'p> {
         self.parse_maybe_binary_or()
     }
 
-    pub(super) fn parse_identifier(&self) -> ParsingResult<Identifier> {
+    pub(super) fn try_parse_identifier(&self) -> ParsingResult<Option<Identifier>> {
         if let Some(token) = self.get_token() {
             return match token.token_type {
                 TokenType::Identifier => {
@@ -25,7 +24,7 @@ impl<'p> Parser<'p> {
             };
         }
 
-        Ok(None)
+        Err(String::from("Unexpected end of tokens"))
     }
 
     pub(super) fn parse_maybe_literal(&self) -> ParsingResult<Expression> {
@@ -37,12 +36,12 @@ impl<'p> Parser<'p> {
                 | TokenType::Numeral
                 | TokenType::LiteralString => {
                     self.advance_cursor();
-                    Ok(Some(Expression::Literal(token)))
+                    Ok(Expression::Literal(token))
                 }
-                _ => Ok(None),
+                _ => Err(String::from("Unexpected token")),
             };
         }
 
-        Ok(None)
+        Err(String::from("Unexpected end of tokens"))
     }
 }

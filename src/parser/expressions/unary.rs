@@ -11,18 +11,15 @@ impl<'p> Parser<'p> {
                 TokenType::Minus | TokenType::Not | TokenType::Hash | TokenType::Tilde => {
                     self.advance_cursor();
                     let right = self.parse_maybe_unary()?;
-                    match right {
-                        Some(right) => Ok(Some(Expression::Unary {
-                            operator: token,
-                            right: Box::new(right),
-                        })),
-                        None => Err(String::from("Failed to parse operand of unary expression")),
-                    }
+                    Ok(Expression::Unary {
+                        operator: token,
+                        right: Box::new(right),
+                    })
                 }
                 _ => self.parse_maybe_binary_exponent(),
             };
         }
 
-        Ok(None)
+        Err(String::from("Unexpected end of tokens"))
     }
 }
