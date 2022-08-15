@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Field},
+    ast::{Expression, Field, TableConstructor},
     parser::{parsing_error::ParsingError, Parser, ParsingResult},
     token::TokenType,
 };
@@ -9,28 +9,33 @@ impl<'p> Parser<'p> {
         if let Some(token) = self.get_token() {
             return match token.token_type {
                 TokenType::LeftBrace => {
-                    self.advance_cursor();
-
-                    let mut fields = Vec::new();
-                    while !self.is_token_of_type(&[TokenType::RightBrace]) {
-                        let field = self.parse_field()?;
-                        fields.push(field);
-
-                        if self.is_token_of_type(&[TokenType::Comma, TokenType::Semicolon]) {
-                            self.advance_cursor();
-                        }
-                    }
-
-                    self.assert_token(TokenType::RightBrace, "Expected '}' after field list")?;
-                    self.advance_cursor();
-
-                    Ok(Expression::TableConstructor { fields })
+                    let table_constructor = self.parse_table_constructor()?;
+                    Ok(Expression::TableConstructor(table_constructor))
                 }
                 _ => self.parse_maybe_literal(),
             };
         }
 
         ParsingError::end_of_tokens(self.get_last_token())
+    }
+
+    pub(super) fn parse_table_constructor(&self) -> ParsingResult<TableConstructor> {
+        self.advance_cursor();
+
+        let mut fields = Vec::new();
+        while !self.is_token_of_type(&[TokenType::RightBrace]) {
+            let field = self.parse_field()?;
+            fields.push(field);
+
+            if self.is_token_of_type(&[TokenType::Comma, TokenType::Semicolon]) {
+                self.advance_cursor();
+            }
+        }
+
+        self.assert_token(TokenType::RightBrace, "Expected '}' after field list")?;
+        self.advance_cursor();
+
+        Ok(TableConstructor { fields })
     }
 
     fn parse_field(&self) -> ParsingResult<Field> {

@@ -90,6 +90,10 @@ mod tests {
             "foo.baz or foo[1 + 2].baz",
             "[or l=foo.baz r=foo[[+ l=`1` r=`2`]].baz]",
         );
+        expect_source_to_equal_ast(
+            "foo.baz() or foo { 1 }",
+            "[or l=[foo.baz a:] r=[foo a:Tc[?=`1` ]]]",
+        );
     }
 
     #[test]
@@ -135,5 +139,20 @@ mod tests {
         expect_source_to_equal_ast("foo.baz[1 + 2]", "foo.baz[[+ l=`1` r=`2`]]");
         expect_source_to_equal_ast("foo[1 + 2][3 + 4]", "foo[[+ l=`1` r=`2`]][[+ l=`3` r=`4`]]");
         expect_source_to_equal_ast("foo[1 + 2].bar", "foo[[+ l=`1` r=`2`]].bar");
+    }
+
+    #[test]
+    fn should_parse_function_calls() {
+        expect_source_to_equal_ast("foo()", "[foo a:]");
+        expect_source_to_equal_ast("foo.bar(1)", "[foo.bar a:`1`, ]");
+        expect_source_to_equal_ast("foo:bar(1)", "[foo:bar a:`1`, ]");
+        expect_source_to_equal_ast("foo.bar(1, 2, 3)", "[foo.bar a:`1`, `2`, `3`, ]");
+        expect_source_to_equal_ast("foo.bar { foo = 1 }", "[foo.bar a:Tc[`foo`=`1` ]]");
+        expect_source_to_equal_ast("foo.bar:baz { foo = 1 }", "[foo.bar:baz a:Tc[`foo`=`1` ]]");
+        expect_source_to_equal_ast("foo.bar 'hello'", "[foo.bar a:`'hello'`]");
+        expect_source_to_equal_ast(
+            "foo.bar(true or false)",
+            "[foo.bar a:[or l=`true` r=`false`], ]",
+        );
     }
 }

@@ -28,7 +28,7 @@ mod visitor;
 // ";
 
 fn main() {
-    let mut scanner = scanner::Scanner::new("foo[bar]");
+    let mut scanner = scanner::Scanner::new("foo:bar '123'");
     match scanner.scan_tokens() {
         Ok(tokens) => match Parser::new(tokens).parse() {
             Ok(expression) => {

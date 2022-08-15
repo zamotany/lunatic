@@ -139,7 +139,7 @@ impl<'p> Parser<'p> {
     pub(super) fn parse_maybe_binary_exponent(&self) -> ParsingResult<Expression> {
         self.try_parse_binary_expression(
             |token_type| token_type == &TokenType::Caret,
-            || self.parse_maybe_var_access(),
+            || self.parse_maybe_function_call(),
             || self.parse_maybe_binary_exponent(),
         )
     }

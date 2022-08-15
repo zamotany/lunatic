@@ -1,5 +1,6 @@
 mod binary;
 mod core;
+mod function_call;
 mod prefix;
 mod table_constructor;
 mod unary;

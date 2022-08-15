@@ -1,6 +1,7 @@
 use crate::{
     ast::{
-        Expression, ExpressionVisitor, Field, FieldVisitor, Identifier, Prefix, PrefixVisitor,
+        Args, ArgsVisitor, Expression, ExpressionVisitor, Field, FieldVisitor, FunctionCallVisitor,
+        Identifier, Prefix, PrefixVisitor, TableConstructor, TableConstructorVisitor,
         VariableVisitor,
     },
     token::Token,
@@ -11,6 +12,40 @@ pub struct DebugVisitor;
 impl PrefixVisitor<String> for DebugVisitor {
     fn visit_prefix_group(&self, expression: &Box<Expression>) -> String {
         format!("({})", expression.visit(self))
+    }
+}
+
+impl FunctionCallVisitor<String> for DebugVisitor {
+    fn visit_function_call(&self, callee: &Box<Prefix>, args: &Args) -> String {
+        format!("[{} a:{}]", callee.visit(self), args.visit(self))
+    }
+
+    fn visit_method_call(&self, callee: &Box<Prefix>, method: &Identifier, args: &Args) -> String {
+        format!(
+            "[{}:{} a:{}]",
+            callee.visit(self),
+            method.0.lexeme,
+            args.visit(self)
+        )
+    }
+}
+
+impl ArgsVisitor<String> for DebugVisitor {
+    fn visit_args_expression_list(&self, expressions: &Vec<Expression>) -> String {
+        let mut expressions_string = String::new();
+        for expression in expressions.iter() {
+            expressions_string.push_str(&expression.visit(self)[..]);
+            expressions_string.push_str(", ")
+        }
+        format!("{}", expressions_string)
+    }
+
+    fn visit_args_table_constructor(&self, table_constructor: &TableConstructor) -> String {
+        table_constructor.visit(self)
+    }
+
+    fn visit_args_literal_string(&self, token: &Token) -> String {
+        self.visit_literal(token)
     }
 }
 
@@ -46,6 +81,16 @@ impl FieldVisitor<String> for DebugVisitor {
     }
 }
 
+impl TableConstructorVisitor<String> for DebugVisitor {
+    fn visit_fields(&self, fields: &Vec<Field>) -> String {
+        let mut fields_string = String::new();
+        for field in fields.iter() {
+            fields_string.push_str(&field.visit(self)[..]);
+        }
+        format!("Tc[{}]", fields_string)
+    }
+}
+
 impl ExpressionVisitor<String> for DebugVisitor {
     fn visit_literal(&self, token: &Token) -> String {
         format!("`{}`", token.lexeme)
@@ -67,13 +112,5 @@ impl ExpressionVisitor<String> for DebugVisitor {
             left.visit(self),
             right.visit(self)
         )
-    }
-
-    fn visit_table_constructor(&self, fields: &Vec<Field>) -> String {
-        let mut fields_string = String::new();
-        for field in fields.iter() {
-            fields_string.push_str(&field.visit(self)[..]);
-        }
-        format!("Tc[{}]", fields_string)
     }
 }
