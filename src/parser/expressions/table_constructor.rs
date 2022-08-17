@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Field, TableConstructor},
+    ast::{Expression, Field, Prefix, TableConstructor, Variable},
     parser::{parsing_error::ParsingError, Parser, ParsingResult},
     token::TokenType,
 };
@@ -57,26 +57,26 @@ impl<'p> Parser<'p> {
                 let value = self.parse_maybe_expression()?;
                 return Ok(Field::Expression { key, value });
             } else {
-                return match self.try_parse_identifier()? {
-                    Some(key) => {
-                        self.assert_token(
-                            TokenType::Equal,
-                            "Expected '=' in field initialization",
-                        )?;
-                        self.advance_cursor();
+                let expression = self.parse_maybe_expression()?;
+                if self.is_token_of_type(&[TokenType::Equal]) {
+                    self.advance_cursor();
 
-                        let value = self.parse_maybe_expression()?;
-                        Ok(Field::Normal { key, value })
-                    }
-                    None if !self.is_token_of_type(&[TokenType::Equal]) => {
-                        let value = self.parse_maybe_expression()?;
-                        Ok(Field::Anonymous { value })
-                    }
-                    _ => ParsingError::new(
-                        "Failed to parse field of table constructor",
-                        self.get_token().unwrap_or(self.get_last_token()),
-                    ),
-                };
+                    return match expression {
+                        Expression::Prefix(Prefix::Variable(Variable::Identifier(identifier))) => {
+                            let value = self.parse_maybe_expression()?;
+                            Ok(Field::Normal {
+                                key: identifier,
+                                value,
+                            })
+                        }
+                        _ => ParsingError::new(
+                            "Failed to parse field of table constructor",
+                            self.get_token().unwrap_or(self.get_last_token()),
+                        ),
+                    };
+                }
+
+                return Ok(Field::Anonymous { value: expression });
             }
         }
 

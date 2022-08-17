@@ -102,6 +102,10 @@ mod tests {
         expect_source_to_equal_ast("{ 123 }", "Tc[?=`123` ]");
         expect_source_to_equal_ast("{ }", "Tc[]");
         expect_source_to_equal_ast("{ 'foo' }", "Tc[?=`'foo'` ]");
+        expect_source_to_equal_ast("{ '1'..'2' }", "Tc[?=[.. l=`'1'` r=`'2'`] ]");
+        expect_source_to_equal_ast("{ foo }", "Tc[?=foo ]");
+        expect_source_to_equal_ast("{ foo() }", "Tc[?=[foo a:] ]");
+        expect_source_to_equal_ast("{ foo(), 1 }", "Tc[?=[foo a:] ?=`1` ]");
         expect_source_to_equal_ast(
             "{ ['fo'..'o'] = 'bar' }",
             "Tc[[.. l=`'fo'` r=`'o'`]=`'bar'` ]",
